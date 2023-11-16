@@ -1,9 +1,11 @@
 //TODO define tests in here
 pub mod trie {
+use std::iter::Peekable;
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::fs;
 use std::collections::HashMap;
+use std::str::Chars;
 
 #[derive(Debug)]
 pub enum CustomError {
@@ -26,35 +28,51 @@ impl TrieNode {
         Rc::new(RefCell::new(TrieNode { is_word: false, char_val: new_char, children: HashMap::new() }))
     }
 
-    fn add_word(&mut self, new_word: String) -> u32 {
-        let mut word_iter = new_word.chars();
-        if let Some(first_char) = word_iter.next() {
-            // println!("first_char is {first_char}");
-            if !self.children.contains_key(&first_char) {
-                println!("first_char {first_char} not in");
-                self.children.insert(first_char, TrieNode::new(first_char));
-                if let Some(new_node) = self.children.get_mut(&first_char) {
-                    return 1 + new_node.borrow_mut().add_word(new_word[1..].to_string());
-                } else{
-                    unreachable!();
-                }
-            } else{
-                println!("first_char {first_char} already exists");
-                if let Some(existing_node) = self.children.get_mut(&first_char) {
-                    return existing_node.borrow_mut().add_word(new_word[1..].to_string());
-                } else{
-                    unreachable!();
-                }
-                //the first char of my string is already present in one of my children
+    fn search_tree(&self, mut chars: Peekable<Chars>, must_be_complete: bool) -> bool{
+        match chars.next() {
+            Some(curr_char) => {
+                println!("char is {curr_char} and self.char_val is {}", self.char_val);
+                    if let Some(&next_char) = chars.peek() {
+                        match self.children.get(&next_char) {
+                            Some(value_from_key) => {
+                                return value_from_key.borrow().search_tree(chars, must_be_complete)
+                            },
+                            //no trienode for next char in iterator
+                            None => return false
+                        }
+                    } else{
+                        //exhaustively matched all chars in iterator to trie
+                        return true
+                    }
+            },
+            None => {
+                unreachable!();
             }
+        }
+    }
+
+    //u32 is number of new nodes inserted, bool is whether this is a new word
+    fn add_word(&mut self, mut new_word: impl Iterator<Item = char>) -> (u32, bool) {
+        if let Some(first_char) = new_word.next() {
+            let mut val_to_add = 0;
+            if !self.children.contains_key(&first_char) {
+                println!("{first_char} not in nodes children");
+                self.children.insert(first_char, TrieNode::new(first_char));
+                val_to_add = 1;
+            } else{
+                println!("{first_char} exists in node children");
+            }
+            let returned_val = self.children.get_mut(&first_char).unwrap().borrow_mut().add_word(new_word);
+            return (val_to_add + returned_val.0, returned_val.1);
         } else{
             //if I have reached the end of my iterator then I will declare that TrieNode I have is the end of a word
             if self.is_word == false{
                 self.is_word = true;
-                println!("Im at the end of the word! char_val is {}", {self.char_val});
+                println!("Im at the end of a new word! char_val is {}", {self.char_val});
+                return (0, true)
             }
             println!("This word already exists{}", {self.char_val});
-            return 0;
+            return (0, false);
         }
     }
 }
@@ -63,6 +81,7 @@ impl TrieNode {
 pub struct Trie {
     pub base_trie_node: TrieNode,
     pub trie_size: u32,
+    pub num_words: u32,
 }
 
 impl Trie{
@@ -71,7 +90,7 @@ impl Trie{
     //otherwise for each word that is separated by a new line character, it will be added to the trie
     pub fn new(file_path: String) -> (Result<Self, CustomError>, Vec<String>){
         //need to read in characters from file
-        let base_trie_node = Trie { base_trie_node: TrieNode { is_word: false, char_val: '!', children: HashMap::new() }, trie_size: 0 };
+        let base_trie_node = Trie { base_trie_node: TrieNode { is_word: false, char_val: '!', children: HashMap::new() }, trie_size: 0, num_words: 0 };
         if file_path.len() == 0 {
             return (Ok(base_trie_node), vec![])
         } 
@@ -99,16 +118,38 @@ impl Trie{
         (Ok(base_trie_node), verified_contents)
     }
 
-    pub fn add_starting_words(&mut self, starting_words: Vec<String>){
+    pub fn add_words(&mut self, starting_words: Vec<String>){
         //this will equal size of tree, but later on when calling for indiviual words
         //the return type of add_word will return interesting information
         let mut num_nodes_added = 0;
         for word in starting_words {
-                num_nodes_added += self.base_trie_node.add_word(word);
+                let returned_tup = self.base_trie_node.add_word(word.chars());
+                num_nodes_added += returned_tup.0;
+                if returned_tup.1 == true {
+                    println!("is a new word");
+                    self.num_words += 1;
+                } else{
+                    println!("not a new word");
+                }
                 println!("num nodes in the tree is {}", num_nodes_added);
             }
         println!("num nodes in the tree is {}", num_nodes_added);
         self.trie_size = num_nodes_added;
     }
+    //NOTE -> base of tree is TrieNode with value !
+    //this function returns true only if the string is 
+    pub fn does_prefix_exist(&self, s: String) -> bool {
+        let s = s.to_ascii_lowercase();
+        self.base_trie_node.search_tree(("!".to_string() + &s).chars().peekable(), false)
+    }
+
+    
+    //this function returns true if the word has been added to the trie
+    pub fn does_word_exist(&self, s: String) -> bool {
+        let s = s.to_ascii_lowercase();
+        self.base_trie_node.search_tree(("!".to_string() + &s).chars().peekable(), true)
+    }
 }
 }
+
+//TODO add tests

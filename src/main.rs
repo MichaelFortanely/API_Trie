@@ -10,11 +10,14 @@ fn main() {
     // println!("{:?}",first);
     match Trie::new(String::from("s.txt")){
         (Ok(mut my_trie), starting_words) => {
-            my_trie.add_starting_words(starting_words);
+            my_trie.add_words(starting_words);
             println!("number of nodes in the trie is {}", my_trie.trie_size);
+            println!("number of words in trie is {}", my_trie.num_words);
+            println!("{}", my_trie.does_word_exist(String::from("BOa")));
         },
         (Err(e), _) => print!("had error {:?}", e),
     }
+    
 }
 //1. taking in new words to add to the trie, 
 //2. giving auto complete suggestions, and 
