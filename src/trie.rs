@@ -30,11 +30,12 @@ impl TrieNode {
 
     fn search_tree(&self, mut chars: Peekable<Chars>, must_be_complete: bool) -> bool{
         match chars.next() {
-            Some(curr_char) => {
-                println!("char is {curr_char} and self.char_val is {}", self.char_val);
+            Some(_) => {
+                // println!("char is {curr_char} and self.char_val is {}", self.char_val);
                     if let Some(&next_char) = chars.peek() {
                         match self.children.get(&next_char) {
                             Some(value_from_key) => {
+                                //next trie node exists
                                 return value_from_key.borrow().search_tree(chars, must_be_complete)
                             },
                             //no trienode for next char in iterator
@@ -42,7 +43,11 @@ impl TrieNode {
                         }
                     } else{
                         //exhaustively matched all chars in iterator to trie
-                        return true
+                        if self.is_word && must_be_complete || !must_be_complete {
+                            return true;
+                        } else {
+                            return false;
+                        }
                     }
             },
             None => {

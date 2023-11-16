@@ -13,7 +13,9 @@ fn main() {
             my_trie.add_words(starting_words);
             println!("number of nodes in the trie is {}", my_trie.trie_size);
             println!("number of words in trie is {}", my_trie.num_words);
-            println!("{}", my_trie.does_word_exist(String::from("BOa")));
+            let my_str = "BoAt";
+            println!("Does word {my_str} exists: {}", my_trie.does_word_exist(String::from(my_str)));
+            println!("Does prefix {my_str} exist: {}", my_trie.does_prefix_exist(String::from(my_str)));
         },
         (Err(e), _) => print!("had error {:?}", e),
     }
