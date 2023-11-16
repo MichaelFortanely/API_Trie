@@ -1,9 +1,5 @@
 apple
+boys
+app
 boy
-cat
-dog
-elephantT
-ffdfdfdfs
-ffdfdfdfg
-hggg
-dfsdsdf
+apples
