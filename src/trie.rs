@@ -71,8 +71,9 @@ impl Trie{
     //otherwise for each word that is separated by a new line character, it will be added to the trie
     pub fn new(file_path: String) -> (Result<Self, CustomError>, Vec<String>){
         //need to read in characters from file
+        let base_trie_node = Trie { base_trie_node: TrieNode { is_word: false, char_val: '!', children: HashMap::new() }, trie_size: 0 };
         if file_path.len() == 0 {
-            return (Ok(Trie { base_trie_node: TrieNode { is_word: false, char_val: '!', children: HashMap::new() }, trie_size: 0 }), vec![])
+            return (Ok(base_trie_node), vec![])
         } 
         //I will enforce that all characters must be a-z
         //first thing to do is try read from the file -> will given in the form of form data in body of API
@@ -95,7 +96,7 @@ impl Trie{
                 }
             }, Err(e) => return (Err(CustomError::UnableToOpen(e)), vec![]),
         }
-        (Ok(Trie { base_trie_node: TrieNode { is_word: false, char_val: '!', children: HashMap::new() }, trie_size: 0 }), verified_contents)
+        (Ok(base_trie_node), verified_contents)
     }
 
     pub fn add_starting_words(&mut self, starting_words: Vec<String>){
