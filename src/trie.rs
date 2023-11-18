@@ -28,7 +28,7 @@ impl TrieNode {
         Rc::new(RefCell::new(TrieNode { is_word: false, char_val: new_char, children: HashMap::new() }))
     }
 
-    fn search_tree(&self, mut chars: Peekable<Chars>, must_be_complete: bool) -> bool{
+    fn search_tree(&mut self, mut chars: Peekable<Chars>, must_be_complete: bool) -> bool{
         match chars.next() {
             Some(_) => {
                 // println!("char is {curr_char} and self.char_val is {}", self.char_val);
@@ -36,7 +36,7 @@ impl TrieNode {
                         match self.children.get(&next_char) {
                             Some(value_from_key) => {
                                 //next trie node exists
-                                return value_from_key.borrow().search_tree(chars, must_be_complete)
+                                return value_from_key.borrow_mut().search_tree(chars, must_be_complete)
                             },
                             //no trienode for next char in iterator
                             None => return false
@@ -143,14 +143,14 @@ impl Trie{
     }
     //NOTE -> base of tree is TrieNode with value !
     //this function returns true only if the string is 
-    pub fn does_prefix_exist(&self, s: String) -> bool {
+    pub fn does_prefix_exist(&mut self, s: String) -> bool {
         let s = s.to_ascii_lowercase();
         self.base_trie_node.search_tree(("!".to_string() + &s).chars().peekable(), false)
     }
 
     
     //this function returns true if the word has been added to the trie
-    pub fn does_word_exist(&self, s: String) -> bool {
+    pub fn does_word_exist(&mut self, s: String) -> bool {
         let s = s.to_ascii_lowercase();
         self.base_trie_node.search_tree(("!".to_string() + &s).chars().peekable(), true)
     }
