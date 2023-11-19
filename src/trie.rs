@@ -50,7 +50,7 @@ impl TrieNode {
                             if get_suffixes {
                                 println!("function _auto_complete initiated");
                                 let mut mut_string = String::new();
-                                self._autocomplete(&mut mut_string, suffic_vec, 3);
+                                self._autocomplete(&mut mut_string, suffic_vec, true);
                             }
                             return true;
                         } else {
@@ -64,7 +64,7 @@ impl TrieNode {
         }
     }
 
-    fn _autocomplete(&self, s: &mut String, suffix_vec: &mut Vec<String>, c: u32) {
+    fn _autocomplete(&self, s: &mut String, suffix_vec: &mut Vec<String>, is_start: bool) {
         //do a DFS from this point  -> add current nodes 
         //I will only need to do the cloning when I am at a word (leaf or node says is word)
         //use this as template when making tests later
@@ -86,6 +86,21 @@ impl TrieNode {
         // }
         // self._autocomplete(s, suffix_vec, c - 1);
         //
+        //how to do DFS
+        // println!("char here is {}", self.char_val);
+        if !is_start{ //included is_start boolean in order to not push ending char of word of interest
+            s.push(self.char_val);
+        }
+        if self.is_word && !is_start{
+            // println!("is word: {}", s.clone());
+            suffix_vec.push(s.clone());
+        }
+        for value in self.children.values() {
+            value.borrow()._autocomplete(s, suffix_vec, false);
+        }
+        if !is_start{
+            s.pop();
+        }
     }
 
     //u32 is number of new nodes inserted, bool is whether this is a new word
@@ -194,6 +209,10 @@ impl Trie{
         let mut suffix_list: Vec<String> = vec![];
         self.base_trie_node._search_tree(("!".to_string() + &(s.to_ascii_lowercase())).chars().peekable(), false, &mut suffix_list, true);
         suffix_list
+    }
+
+    pub fn entire_dictionary(&self) -> Vec<String> {
+        self.autocomplete(String::new())
     }
 }
 }

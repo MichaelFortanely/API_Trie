@@ -17,9 +17,12 @@ fn main() {
             let my_str2 = my_str.clone();
             println!("Does word {my_str} exists: {}", my_trie.does_word_exist(my_str.clone()));
             println!("Does prefix {my_str2} exist: {}", my_trie.does_prefix_exist(my_str2.clone()));
-            my_trie.autocomplete("pepperyGirl".to_string());
-            println!("{:?}", my_trie.autocomplete(String::from("saltyMan")));
-            print!("suffix list for pepper{:?}", my_trie.autocomplete(String::from("pepper")));
+            // my_trie.autocomplete("pepperyGirl".eto_string());
+            // println!("{:?}", my_trie.autocomplete(String::from("pepper")));
+            let sugegestion = String::from("pep");
+            let suggestions = my_trie.autocomplete(sugegestion.clone());
+            println!("num_suggestions: {}; suffix list for suggestion {}: {:?}",  suggestions.len(), sugegestion, suggestions);
+            println!("entire dictionary: {:?}", my_trie.entire_dictionary());
         },
         (Err(e), _) => print!("had error {:?}", e),
     }
@@ -29,4 +32,5 @@ fn main() {
 //2. giving auto complete suggestions, and 
 //3. giving a bool for if the word exists in the trie or not
 //4. size of the Trie or the number of nodes
+//What if I built an application in rust and one in python using my API
 //how to implement a trie --> do this first in sync manner and then consider async
