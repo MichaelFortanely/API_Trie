@@ -51,10 +51,10 @@ impl TrieNode {
                                     //not yet encoutered another word node when bubbling back up call stack
                                     //do deletion logic of deleting child
                                     return_val.1 += 1;
-                                    //TODO actually delete child
                                     drop(self.children.remove(&next_char).unwrap());
 
-                                    if self.is_word{
+                                    //should not be dropping current node if I still have other children
+                                    if self.is_word || self.children.keys().len() > 0{
                                         return_val.2 = false;
                                         //this will tell caller in a delete operation to stop deleting child node
                                     }
