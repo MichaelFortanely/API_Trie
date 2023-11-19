@@ -22,13 +22,16 @@ pub struct TrieNode {
     char_val: char,
     children: HashMap<char, Rc<RefCell<TrieNode>>>,
 }
+//having helper functions that return refernces can get really complicated
+//try to implement this without many helper functions i.e. references that return TrieNodes bc then stuff gets really complicated
+
 
 impl TrieNode {
     fn new(new_char: char) -> Rc<RefCell<Self>>{
         Rc::new(RefCell::new(TrieNode { is_word: false, char_val: new_char, children: HashMap::new() }))
     }
 
-    fn search_tree(&self, mut chars: Peekable<Chars>, must_be_complete: bool) -> bool{
+    fn _search_tree(&self, mut chars: Peekable<Chars>, must_be_complete: bool, suffic_vec: &mut Vec<String>, get_suffixes: bool) -> bool{
         match chars.next() {
             Some(_) => {
                 // println!("char is {curr_char} and self.char_val is {}", self.char_val);
@@ -36,7 +39,7 @@ impl TrieNode {
                         match self.children.get(&next_char) {
                             Some(value_from_key) => {
                                 //next trie node exists
-                                return value_from_key.borrow().search_tree(chars, must_be_complete)
+                                return value_from_key.borrow()._search_tree(chars, must_be_complete, suffic_vec, get_suffixes)
                             },
                             //no trienode for next char in iterator
                             None => return false
@@ -44,6 +47,11 @@ impl TrieNode {
                     } else{
                         //exhaustively matched all chars in iterator to trie
                         if self.is_word && must_be_complete || !must_be_complete {
+                            if get_suffixes {
+                                println!("function _auto_complete initiated");
+                                let mut mut_string = String::new();
+                                self._autocomplete(&mut mut_string, suffic_vec, 3);
+                            }
                             return true;
                         } else {
                             return false;
@@ -56,8 +64,32 @@ impl TrieNode {
         }
     }
 
+    fn _autocomplete(&self, s: &mut String, suffix_vec: &mut Vec<String>, c: u32) {
+        //do a DFS from this point  -> add current nodes 
+        //I will only need to do the cloning when I am at a word (leaf or node says is word)
+        //use this as template when making tests later
+        // println!("in _auto_complete");
+        // if c == 3{
+        //     s.push('a');
+        //     suffix_vec.push(s.clone());
+        // }
+        // if c == 2{
+        //     s.push('b');
+        // }
+        // if c == 1{
+        //     s.push('c');
+        //     suffix_vec.push(s.clone());
+        // }
+        // if c == 0{
+        //     s.push('d');
+        //     return;
+        // }
+        // self._autocomplete(s, suffix_vec, c - 1);
+        //
+    }
+
     //u32 is number of new nodes inserted, bool is whether this is a new word
-    fn add_word(&mut self, mut new_word: impl Iterator<Item = char>) -> (u32, bool) {
+    fn _add_word(&mut self, mut new_word: impl Iterator<Item = char>) -> (u32, bool) {
         if let Some(first_char) = new_word.next() {
             let mut val_to_add = 0;
             if !self.children.contains_key(&first_char) {
@@ -67,7 +99,7 @@ impl TrieNode {
             } else{
                 println!("{first_char} exists in node children");
             }
-            let returned_val = self.children.get_mut(&first_char).unwrap().borrow_mut().add_word(new_word);
+            let returned_val = self.children.get_mut(&first_char).unwrap().borrow_mut()._add_word(new_word);
             return (val_to_add + returned_val.0, returned_val.1);
         } else{
             //if I have reached the end of my iterator then I will declare that TrieNode I have is the end of a word
@@ -128,7 +160,7 @@ impl Trie{
         //the return type of add_word will return interesting information
         let mut num_nodes_added = 0;
         for word in starting_words {
-                let returned_tup = self.base_trie_node.add_word(word.chars());
+                let returned_tup = self.base_trie_node._add_word(word.chars());
                 num_nodes_added += returned_tup.0;
                 if returned_tup.1 == true {
                     println!("is a new word");
@@ -144,15 +176,24 @@ impl Trie{
     //NOTE -> base of tree is TrieNode with value !
     //this function returns true only if the string is 
     pub fn does_prefix_exist(&self, s: String) -> bool {
-        let s = s.to_ascii_lowercase();
-        self.base_trie_node.search_tree(("!".to_string() + &s).chars().peekable(), false)
+        let mut placeholder: Vec<String> = vec![];
+        self.base_trie_node._search_tree(("!".to_string() + &(s.to_ascii_lowercase())).chars().peekable(), false, &mut placeholder, false)
     }
 
-    
     //this function returns true if the word has been added to the trie
     pub fn does_word_exist(&self, s: String) -> bool {
-        let s = s.to_ascii_lowercase();
-        self.base_trie_node.search_tree(("!".to_string() + &s).chars().peekable(), true)
+        let mut placeholder: Vec<String> = vec![];
+        self.base_trie_node._search_tree(("!".to_string() + &(s.to_ascii_lowercase())).chars().peekable(), true, &mut placeholder, false)
+    }
+
+    //the two functions above have placholder vectors
+    //I will do a DFS using a string that will be added to the vector that is passed in as a mutable reference so it does not need to be returned
+
+    //will return with blank if not even a prefix does not work
+    pub fn autocomplete(&self, s: String) -> Vec<String>{
+        let mut suffix_list: Vec<String> = vec![];
+        self.base_trie_node._search_tree(("!".to_string() + &(s.to_ascii_lowercase())).chars().peekable(), false, &mut suffix_list, true);
+        suffix_list
     }
 }
 }
