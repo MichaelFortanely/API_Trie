@@ -34,7 +34,7 @@ impl TrieNode {
     //in order to return the number of nodes that are deleted, need to bubble that information up the call stack, similar to how _add_words does with Trie caller
     //for return type, first bool is whether the word or prefix (based off of must_be_complete) is found, u32 is num nodes deleted, and last bool
     //tells caller whether to remove child node during a delete operation
-    fn _search_tree(&mut self, mut chars: Peekable<Chars>, must_be_complete: bool, suffic_vec: &mut Vec<String>, get_suffixes: bool, is_delete_op: bool) -> (bool, u32, bool){
+    fn _delete_from_trie(&mut self, mut chars: Peekable<Chars>) -> (bool, u32, bool){
         match chars.next() {
             Some(_) => {
                 // println!("char is {curr_char} and self.char_val is {}", self.char_val);
@@ -42,19 +42,16 @@ impl TrieNode {
                         match self.children.get(&next_char) {
                             Some(value_from_key) => {
                                 //next trie node exists
-                                let mut return_val =  value_from_key.borrow_mut()._search_tree(chars, must_be_complete, suffic_vec, get_suffixes, is_delete_op);
-                                if is_delete_op{
-                                    // println!("value of delete child is {}", return_val.2);
-                                }
-                                if is_delete_op && return_val.2 {
-                                    //todo why am I never getting this far -> I will only get here if and only if word I deleted is a leaf node and have
-                                    //not yet encoutered another word node when bubbling back up call stack
+                                let mut return_val =  value_from_key.borrow_mut()._delete_from_trie(chars);
+                                if return_val.2 {
+                                    //not yet encoutered another word node when bubbling back up call stack -> this assumption was incorrect and 
+                                    //caused bug in penultimate commit from this one
                                     //do deletion logic of deleting child
                                     return_val.1 += 1;
                                     drop(self.children.remove(&next_char).unwrap());
 
                                     //should not be dropping current node if I still have other children
-                                    if self.is_word || self.children.keys().len() > 0{
+                                    if self.is_word || self.children.keys().len() > 0 {
                                         return_val.2 = false;
                                         //this will tell caller in a delete operation to stop deleting child node
                                     }
@@ -66,24 +63,18 @@ impl TrieNode {
                         }
                     } else{
                         //exhaustively matched all chars in iterator to trie
-                        if self.is_word && must_be_complete || !must_be_complete {
+                        if self.is_word {
                             let mut delete_child = false;
-                            if get_suffixes {
-                                // println!("function _auto_complete initiated");
-                                let mut mut_string = String::new();
-                                self._autocomplete(&mut mut_string, suffic_vec, true);
-                            } else if is_delete_op {
-                                println!("delete operation initiated");
-                                //If I have no children then I need to bubble back up the call stack
-                                //until self.is_word equals true and delete all nodes until then
-                                //if I have children then just mark myself as not a word anymore
-                                self.is_word = false;
+                            println!("delete operation initiated");
+                            //If I have no children then I need to bubble back up the call stack
+                            //until self.is_word equals true and delete all nodes until then
+                            //if I have children then just mark myself as not a word anymore
+                            self.is_word = false;
 
-                                if self.children.keys().len() == 0 {
-                                    //need to bubble up the call stack until I find a word, deleting all words until
-                                    delete_child = true;
-                                } //else I need to do nothing
-                            }
+                            if self.children.keys().len() == 0 {
+                                //need to bubble up the call stack until I find a word, deleting all words until
+                                delete_child = true;
+                            } //else I need to do nothing
                             //only increment this u32 return value when actually deleting the child
                             //the boolean just tells the caller whether or not to actually delete the node it originall called this function on
                             return (true, 0, delete_child);
@@ -98,7 +89,41 @@ impl TrieNode {
         }
     }
 
-    fn _autocomplete(&mut self, s: &mut String, suffix_vec: &mut Vec<String>, is_start: bool) {
+    fn _search_tree(&self, mut chars: Peekable<Chars>, must_be_complete: bool, suffic_vec: &mut Vec<String>, get_suffixes: bool) -> bool{
+        match chars.next() {
+            Some(_) => {
+                // println!("char is {curr_char} and self.char_val is {}", self.char_val);
+                    if let Some(&next_char) = chars.peek() {
+                        match self.children.get(&next_char) {
+                            Some(value_from_key) => {
+                                //next trie node exists
+                                return value_from_key.borrow()._search_tree(chars, must_be_complete, suffic_vec, get_suffixes)
+                            },
+                            //no trienode for next char in iterator
+                            None => return false
+                        }
+                    } else{
+                        //exhaustively matched all chars in iterator to trie
+                        if self.is_word && must_be_complete || !must_be_complete {
+                            if get_suffixes {
+                                println!("function _auto_complete initiated");
+                                let mut mut_string = String::new();
+                                self._autocomplete(&mut mut_string, suffic_vec, true);
+                            }
+                            return true;
+                        } else {
+                            return false;
+                        }
+                    }
+            },
+            None => {
+                unreachable!();
+            }
+        }
+    }
+   
+
+    fn _autocomplete(&self, s: &mut String, suffix_vec: &mut Vec<String>, is_start: bool) {
         //do a DFS from this point  -> add current nodes 
         //I will only need to do the cloning when I am at a word (leaf or node says is word)
         // println!("char here is {}", self.char_val);
@@ -204,26 +229,26 @@ impl Trie{
     }
     //NOTE -> base of tree is TrieNode with value !
     //this function returns true only if the string is 
-    pub fn does_prefix_exist(&mut self, s: String) -> bool {
-        self.base_trie_node._search_tree(("!".to_string() + &(s.to_ascii_lowercase())).chars().peekable(), false, &mut vec![], false, false).0
+    pub fn does_prefix_exist(&self, s: String) -> bool {
+        self.base_trie_node._search_tree(("!".to_string() + &(s.to_ascii_lowercase())).chars().peekable(), false, &mut vec![], false)
     }
 
     //this function returns true if the word has been added to the trie
-    pub fn does_word_exist(&mut self, s: String) -> bool {
-        self.base_trie_node._search_tree(("!".to_string() + &(s.to_ascii_lowercase())).chars().peekable(), true, &mut vec![], false, false).0
+    pub fn does_word_exist(&self, s: String) -> bool {
+        self.base_trie_node._search_tree(("!".to_string() + &(s.to_ascii_lowercase())).chars().peekable(), true, &mut vec![], false)
     }
 
     //the two functions above have placholder vectors
     //I will do a DFS using a string that will be added to the vector that is passed in as a mutable reference so it does not need to be returned
 
     //will return with blank if not even a prefix does not work
-    pub fn autocomplete(&mut self, s: String) -> Vec<String>{
+    pub fn autocomplete(&self, s: String) -> Vec<String>{
         let mut suffix_list: Vec<String> = vec![];
-        self.base_trie_node._search_tree(("!".to_string() + &(s.to_ascii_lowercase())).chars().peekable(), false, &mut suffix_list, true, false);
+        self.base_trie_node._search_tree(("!".to_string() + &(s.to_ascii_lowercase())).chars().peekable(), false, &mut suffix_list, true);
         suffix_list
     }
 
-    pub fn entire_dictionary(&mut self) -> Vec<String> {
+    pub fn entire_dictionary(&self) -> Vec<String> {
         self.autocomplete(String::new())
     }
 
@@ -234,7 +259,7 @@ impl Trie{
     //is word not a leaf node -> then mark as not a word anymore
     //returns true if deleted, false if not deleted
     pub fn delete_word(&mut self, s: String) -> bool{
-        let return_val = self.base_trie_node._search_tree(("!".to_string() + &(s.to_ascii_lowercase())).chars().peekable(), true, &mut vec![], false, true);
+        let return_val = self.base_trie_node._delete_from_trie(("!".to_string() + &(s.to_ascii_lowercase())).chars().peekable());
         if return_val.0{
             //at this point I know for sure the word exists
             self.num_words -= 1;
