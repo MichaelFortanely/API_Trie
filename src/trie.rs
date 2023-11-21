@@ -1,5 +1,4 @@
 //TODO define tests in here
-pub mod trie {
 use std::iter::Peekable;
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -210,6 +209,7 @@ impl Trie{
     }
 
     pub fn add_words(&mut self, starting_words: Vec<String>){
+        //this function also needs to acquire lock
         //this will equal size of tree, but later on when calling for indiviual words
         //the return type of add_word will return interesting information
         let mut num_nodes_added = 0;
@@ -259,6 +259,7 @@ impl Trie{
     //is word not a leaf node -> then mark as not a word anymore
     //returns true if deleted, false if not deleted
     pub fn delete_word(&mut self, s: String) -> bool{
+        //this function should acquire lock if it does not yet have
         let return_val = self.base_trie_node._delete_from_trie(("!".to_string() + &(s.to_ascii_lowercase())).chars().peekable());
         if return_val.0{
             //at this point I know for sure the word exists
@@ -270,6 +271,7 @@ impl Trie{
         return_val.0
     }
 
+    //this function should acquire lock
     pub fn delete_dictionary(&mut self){
         for word in self.entire_dictionary() {
             println!("next word to delete is {}", {word.clone()});
@@ -281,6 +283,61 @@ impl Trie{
     }
     
 }
-}
 
-//TODO add tests
+// fn main() {
+//     println!("Hello, world!");
+//     // let first = TrieNode::new('a');
+//     // println!("{:?}",first);
+//     match Trie::new(String::from("s.txt")){
+//         (Ok(mut my_trie), starting_words) => {
+//             my_trie.add_words(starting_words);
+//             println!("number of nodes in the trie is {}", my_trie.trie_size);
+//             println!("number of words in trie is {}", my_trie.num_words);
+//             let my_str = String::from("BoAt");
+//             let my_str2 = my_str.clone();
+//             println!("Does word {my_str} exist: {}", my_trie.does_word_exist(my_str.clone()));
+//             println!("Does prefix {my_str2} exist: {}", my_trie.does_prefix_exist(my_str2.clone()));
+//             // my_trie.autocomplete("pepperyGirl".eto_string());
+//             println!("{:?}", my_trie.autocomplete(String::from("")));
+//             my_trie.delete_word(String::from("BoAt"));
+//             // let sugegestion = String::from("appalachian");
+//             // let suggestions = my_trie.autocomplete(sugegestion.clone());
+//             // println!("num_suggestions: {}; suffix list for suggestion {}: {:?}",  suggestions.len(), sugegestion.clone(), suggestions);
+//             // println!("entire dictionary: {:?}", my_trie.entire_dictionary());
+//             // println!("successful deletion of {}: {}", sugegestion.clone(), my_trie.delete_word(sugegestion.clone()));
+//             // println!("Does word {} exist: {}", sugegestion.clone(), my_trie.does_word_exist(sugegestion.clone()));
+//             // let auto_comp_after_del = String::from("ap");
+//             // let second_round_suggest =  my_trie.autocomplete(auto_comp_after_del.clone());
+//             // println!("num_suggestions: {}; suffix list for suggestion {}: {:?}",  second_round_suggest.len(), auto_comp_after_del.clone(), second_round_suggest);
+//             // println!("entire dictionary: {:?}", my_trie.entire_dictionary());
+//             // println!("number of nodes in the trie is {}", my_trie.trie_size);
+//             // println!("number of words in trie is {}", my_trie.num_words);
+//             // let third_word: String = String::from("appalachianS");
+//             // my_trie.add_words(vec![third_word.clone()]);
+//             // println!("added word {}", third_word.clone());
+//             // let third_round_suggest =  my_trie.autocomplete(auto_comp_after_del.clone());
+//             // println!("num_suggestions: {}; suffix list for suggestion {}: {:?}",  third_round_suggest.len(), third_word.clone(), third_round_suggest);
+//             // println!("entire dictionary: {:?}", my_trie.entire_dictionary());
+//             // println!("number of nodes in the trie is {}", my_trie.trie_size);
+//             // println!("number of words in trie is {}", my_trie.num_words);
+//             // //TODO figure out why number of nodes in trie is incorrect, everything else looks good tho
+//             // //TODO right unit tests before putting into an API
+//             // println!("deleting entire dictionary");
+//             // my_trie.delete_dictionary();//debug this, figure out why not working
+//             // //should be able to delete all words like this
+//             // println!("number of nodes in the trie is {}", my_trie.trie_size);
+//             // println!("number of words in trie is {}", my_trie.num_words);
+//         },
+//         (Err(e), _) => print!("had error {:?}", e),
+//     }
+    
+// }
+//1. taking in new words to add to the trie, 
+//2. giving auto complete suggestions, and 
+//3. giving a bool for if the word exists in the trie or not
+//4. size of the Trie or the number of nodes
+//What if I built an application in rust and one in python using my API
+//how to implement a trie --> do this first in sync manner and then consider async
+
+
+//TODO add tests --> use this driver code to help create tests

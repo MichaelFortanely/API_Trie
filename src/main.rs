@@ -2,58 +2,96 @@
 mod trie;
 
 // Use statements for specific items if needed
-use crate::trie::trie::*;
+use crate::trie::*;
+use serde::Deserialize;
 
-fn main() {
-    println!("Hello, world!");
-    // let first = TrieNode::new('a');
-    // println!("{:?}",first);
-    match Trie::new(String::from("s.txt")){
-        (Ok(mut my_trie), starting_words) => {
-            my_trie.add_words(starting_words);
-            println!("number of nodes in the trie is {}", my_trie.trie_size);
-            println!("number of words in trie is {}", my_trie.num_words);
-            let my_str = String::from("BoAt");
-            let my_str2 = my_str.clone();
-            println!("Does word {my_str} exist: {}", my_trie.does_word_exist(my_str.clone()));
-            println!("Does prefix {my_str2} exist: {}", my_trie.does_prefix_exist(my_str2.clone()));
-            // my_trie.autocomplete("pepperyGirl".eto_string());
-            // println!("{:?}", my_trie.autocomplete(String::from("pepper")));
-            let sugegestion = String::from("appalachian");
-            let suggestions = my_trie.autocomplete(sugegestion.clone());
-            println!("num_suggestions: {}; suffix list for suggestion {}: {:?}",  suggestions.len(), sugegestion.clone(), suggestions);
-            println!("entire dictionary: {:?}", my_trie.entire_dictionary());
-            println!("successful deletion of {}: {}", sugegestion.clone(), my_trie.delete_word(sugegestion.clone()));
-            println!("Does word {} exist: {}", sugegestion.clone(), my_trie.does_word_exist(sugegestion.clone()));
-            let auto_comp_after_del = String::from("ap");
-            let second_round_suggest =  my_trie.autocomplete(auto_comp_after_del.clone());
-            println!("num_suggestions: {}; suffix list for suggestion {}: {:?}",  second_round_suggest.len(), auto_comp_after_del.clone(), second_round_suggest);
-            println!("entire dictionary: {:?}", my_trie.entire_dictionary());
-            println!("number of nodes in the trie is {}", my_trie.trie_size);
-            println!("number of words in trie is {}", my_trie.num_words);
-            let third_word: String = String::from("appalachianS");
-            my_trie.add_words(vec![third_word.clone()]);
-            println!("added word {}", third_word.clone());
-            let third_round_suggest =  my_trie.autocomplete(auto_comp_after_del.clone());
-            println!("num_suggestions: {}; suffix list for suggestion {}: {:?}",  third_round_suggest.len(), third_word.clone(), third_round_suggest);
-            println!("entire dictionary: {:?}", my_trie.entire_dictionary());
-            println!("number of nodes in the trie is {}", my_trie.trie_size);
-            println!("number of words in trie is {}", my_trie.num_words);
-            //TODO figure out why number of nodes in trie is incorrect, everything else looks good tho
-            //TODO right unit tests before putting into an API
-            println!("deleting entire dictionary");
-            my_trie.delete_dictionary();//debug this, figure out why not working
-            //should be able to delete all words like this
-            println!("number of nodes in the trie is {}", my_trie.trie_size);
-            println!("number of words in trie is {}", my_trie.num_words);
-        },
-        (Err(e), _) => print!("had error {:?}", e),
-    }
-    
+use axum::{
+    routing::{get, post},
+    Router, response::{IntoResponse, Html}, http::method, extract::{Query, Path},
+};
+
+#[tokio::main]
+async fn main() {
+    // build our application with a single route
+    //DELETE ME LATER
+    let mut myTrie = Trie::new(String::from("s.txt"));
+    match myTrie{
+            (Ok(mut my_trie), starting_words) => {
+                my_trie.add_words(starting_words);
+                println!("number of nodes in the trie is {}", my_trie.trie_size);
+                println!("number of words in trie is {}", my_trie.num_words);
+                let my_str = String::from("BoAt");
+                let my_str2 = my_str.clone();
+                println!("Does word {my_str} exist: {}", my_trie.does_word_exist(my_str.clone()));
+                println!("Does prefix {my_str2} exist: {}", my_trie.does_prefix_exist(my_str2.clone()));
+            },
+            (Err(e), _) => print!("had error {:?}", e),
+        }
+    //DELETE ABOVE LATER
+    let app = Router::new().route("/", get(|| async { "Hello to Michael's Trie world!"}))
+    .route("/prefix", get(get_prefix_search))
+    .route("/wordsearch/:name", get(get_word_search))
+    .route("/autocomp", get(get_auto_complete))
+    .route("/create", post(post_create_trie));
+    // .route("/new_trie", post(post_create_trie()));
+
+    // run it with hyper on localhost:3000
+    axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
 }
-//1. taking in new words to add to the trie, 
-//2. giving auto complete suggestions, and 
-//3. giving a bool for if the word exists in the trie or not
-//4. size of the Trie or the number of nodes
-//What if I built an application in rust and one in python using my API
-//how to implement a trie --> do this first in sync manner and then consider async
+
+async fn post_create_trie() -> impl IntoResponse{
+    println!("patch add_words");
+    Html(format!("Hello <strong>Michael</strong>"))
+}
+
+#[derive(Debug, Deserialize)]
+struct TestParams {
+    name: Option<String>,
+}
+
+// http://localhost:3000/prefix?name=salty
+//add params with key-value pairs spearated by ?
+async fn get_prefix_search(Query(params): Query<TestParams>) -> impl IntoResponse{
+    println!("{:?}", params);
+    //example
+    // let name = params.name.as_deref().unwrap_or("JohnSmith");
+    // Html(format!("Hello <strong>{name}</strong>"))
+    
+
+}
+
+//example how to get path parms
+// async fn get_word_search(Path(name): Path<String>) -> impl IntoResponse{
+//     println!("{:?}", name);
+//     // let name = name.unwrap_or("JohnSmith");
+//     Html(format!("Hello <strong>{name}</strong>"))
+// }
+async fn get_word_search(Path(name): Path<String>) -> impl IntoResponse{
+    println!("{:?}", name);
+    // let name = name.unwrap_or("JohnSmith");
+    Html(format!("Hello <strong>{name}</strong>"))
+}
+
+async fn get_auto_complete() -> impl IntoResponse{
+    println!("do_word_search");
+    Html("GET automatetion")
+}
+
+async fn delete_words() {
+    println!("delete_words");
+}
+
+//put tests for trie_router here and tests for the trie in trie.rs
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    fn name() {
+        let result = 2 + 2;
+        assert_eq!(result, 4);
+    }
+}
