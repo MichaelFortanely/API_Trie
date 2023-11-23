@@ -1,6 +1,5 @@
 mod trie;
 use axum::extract::State;
-use std::sync::{Arc, Mutex};
 
 // Use statements for specific items if needed
 use crate::trie::*;
@@ -11,29 +10,11 @@ use axum::{
     Router, response::{IntoResponse, Html}, http::method, extract::{Query, Path},
 };
 
-#[derive(Debug, Clone)]
-struct ModelController{
-    //I want to have a mutex on each vector
-    trie: Arc<Mutex<Trie>>,
-}
 
-//have ModelController conduct synchronization, start with no sync and a single model
-impl ModelController {
-    fn new() -> Self {
-         match Trie::new(String::from("s.txt")){
-            (Ok(mut my_trie), starting_words) => {
-                ModelController {trie: Arc::new(Mutex::new(my_trie))}
-            },
-            (Err(e), _) => unreachable!(),
-        }
-    }
-
-    
-}
 
 #[tokio::main]
 async fn main() {
-    let controller = ModelController::new();
+    let controller = TrieController::new();
 
    
     axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
@@ -43,7 +24,7 @@ async fn main() {
     // run it with hyper on localhost:3000
 }
 
-fn routes_crud(trie: State<ModelController>) -> Router {
+fn routes_crud(trie: State<TrieController>) -> Router {
     Router::new().route("/", get(|| async { "Hello to Michael's Trie world!"}))
     .route("/prefix", get(get_prefix_search))
     .route("/wordsearch/:name", get(get_word_search))
@@ -95,13 +76,13 @@ async fn delete_words() {
 }
 
 //put tests for trie_router here and tests for the trie in trie.rs
-#[cfg(test)]
-mod tests {
-    use super::*;
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
     
-    #[test]
-    fn name() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
-    }
-}
+//     #[test]
+//     fn name() {
+//         let result = 2 + 2;
+//         assert_eq!(result, 4);
+//     }
+// }

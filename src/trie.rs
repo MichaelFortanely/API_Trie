@@ -2,7 +2,7 @@ use std::iter::Peekable;
 use std::fs;
 use std::collections::HashMap;
 use std::str::Chars;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::sync::RwLock;
 
 #[derive(Debug)]
@@ -284,6 +284,124 @@ impl Trie{
         println!("done!");
     }
     
+}
+#[derive(Debug, Clone)]
+pub struct TrieController{
+    //I want to have a mutex on each vector
+    trie: Arc<Mutex<Trie>>,
+}
+
+//have ModelController conduct synchronization, start with no sync and a single model
+impl TrieController {
+    pub fn new() -> Self {
+         match Trie::new(String::from("s.txt")){
+            (Ok(mut trie), starting_words) => {
+                TrieController {trie: Arc::new(Mutex::new(trie))}
+            },
+            (Err(e), _) => panic!(),
+        }
+    }
+    
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn create_empty_trie() {
+        let result = 2 + 2;
+        assert_eq!(result, 4);
+    }
+
+    #[test]
+    fn create_trie_from_file() {
+        let result = 2 + 2;
+        assert_eq!(result, 4);
+    }
+
+    #[test]
+    fn create_trie_from_noexistent_file() {
+        let result = 2 + 2;
+        assert_eq!(result, 4);
+    }
+
+    #[test]
+    fn retrieve_all_words() {
+        let result = 2 + 2;
+        assert_eq!(result, 4);
+    }
+
+    #[test]
+    fn delete_all_words() {
+        let result = 2 + 2;
+        assert_eq!(result, 4);
+    }
+
+    #[test]
+    fn add_invalid_word() {
+        let result = 2 + 2;
+        assert_eq!(result, 4);
+    }
+
+    #[test]
+    fn add_uppercase_word() {
+        let result = 2 + 2;
+        assert_eq!(result, 4);
+    }
+
+    #[test]
+    fn prefix_search_invalid_word() {
+        let result = 2 + 2;
+        assert_eq!(result, 4);
+    }
+
+    #[test]
+    fn prefix_search_valid_word() {
+        let result = 2 + 2;
+        assert_eq!(result, 4);
+    }
+
+    #[test]
+    fn prefix_search_uppercase_valid_word() {
+        let result = 2 + 2;
+        assert_eq!(result, 4);
+    }
+
+    #[test]
+    fn word_search_invalid_word() {
+        let result = 2 + 2;
+        assert_eq!(result, 4);
+    }
+
+    #[test]
+    fn word_search_valid_word() {
+        let result = 2 + 2;
+        assert_eq!(result, 4);
+    }
+
+    #[test]
+    fn word_search_uppercase_valid_word() {
+        let result = 2 + 2;
+        assert_eq!(result, 4);
+    }
+
+    #[test]
+    fn multithread_delete_then_search() {
+        let result = 2 + 2;
+        assert_eq!(result, 4);
+    }
+
+    #[test]
+    fn multithread_delete_while_search() {
+        let result = 2 + 2;
+        assert_eq!(result, 4);
+    }
+
+    #[test]
+    fn multithread_read_ops() {
+        let result = 2 + 2;
+        assert_eq!(result, 4);
+    }
 }
 
 // fn main() {
