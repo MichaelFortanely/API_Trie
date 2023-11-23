@@ -1,10 +1,9 @@
-//TODO define tests in here
 use std::iter::Peekable;
-use std::rc::Rc;
-use std::cell::RefCell;
 use std::fs;
 use std::collections::HashMap;
 use std::str::Chars;
+use std::sync::Arc;
+use std::sync::RwLock;
 
 #[derive(Debug)]
 pub enum CustomError {
@@ -13,21 +12,24 @@ pub enum CustomError {
     UnableToOpen(std::io::Error)
 }
 
-//I should change my implementation to use map of char to Rc<RefCell<TrieNode>>
-//to 
+//How to make this multi threaded
 #[derive(Debug)]
 pub struct TrieNode {
     is_word: bool,
     char_val: char,
-    children: HashMap<char, Rc<RefCell<TrieNode>>>,
+    //changed implementation to use Arc from Rc to be able to use multiple threads
+    //Had to make use of RwLock in order to have interior mutability of shared reference with is thread-safe,
+    //because RefCell does not implement Sync Trait
+    //will be making use of Mutex to actually take care of Synchronization, will not rely on synchronization properties of RwLock at all
+    children: HashMap<char, Arc<RwLock<TrieNode>>>,
 }
 //having helper functions that return refernces can get really complicated
 //try to implement this without many helper functions i.e. references that return TrieNodes bc then stuff gets really complicated
 
 
 impl TrieNode {
-    fn new(new_char: char) -> Rc<RefCell<Self>>{
-        Rc::new(RefCell::new(TrieNode { is_word: false, char_val: new_char, children: HashMap::new() }))
+    fn new(new_char: char) -> Arc<RwLock<Self>>{
+        Arc::new(RwLock::new(TrieNode { is_word: false, char_val: new_char, children: HashMap::new() }))
     }
 
     //in order to return the number of nodes that are deleted, need to bubble that information up the call stack, similar to how _add_words does with Trie caller
@@ -41,7 +43,7 @@ impl TrieNode {
                         match self.children.get(&next_char) {
                             Some(value_from_key) => {
                                 //next trie node exists
-                                let mut return_val =  value_from_key.borrow_mut()._delete_from_trie(chars);
+                                let mut return_val =  value_from_key.write().unwrap()._delete_from_trie(chars);
                                 if return_val.2 {
                                     //not yet encoutered another word node when bubbling back up call stack -> this assumption was incorrect and 
                                     //caused bug in penultimate commit from this one
@@ -96,7 +98,7 @@ impl TrieNode {
                         match self.children.get(&next_char) {
                             Some(value_from_key) => {
                                 //next trie node exists
-                                return value_from_key.borrow()._search_tree(chars, must_be_complete, suffic_vec, get_suffixes)
+                                return value_from_key.read().unwrap()._search_tree(chars, must_be_complete, suffic_vec, get_suffixes)
                             },
                             //no trienode for next char in iterator
                             None => return false
@@ -134,7 +136,7 @@ impl TrieNode {
             suffix_vec.push(s.clone());
         }
         for value in self.children.values() {
-            value.borrow_mut()._autocomplete(s, suffix_vec, false);
+            value.write().unwrap()._autocomplete(s, suffix_vec, false);
         }
         if !is_start{
             s.pop();
@@ -152,7 +154,7 @@ impl TrieNode {
             } else{
                 // println!("{first_char} exists in node children");
             }
-            let returned_val = self.children.get_mut(&first_char).unwrap().borrow_mut()._add_word(new_word);
+            let returned_val = self.children.get_mut(&first_char).unwrap().write().unwrap()._add_word(new_word);
             return (val_to_add + returned_val.0, returned_val.1);
         } else{
             //if I have reached the end of my iterator then I will declare that TrieNode I have is the end of a word

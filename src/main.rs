@@ -1,5 +1,6 @@
-//define an enum that has custom error types
 mod trie;
+use axum::extract::State;
+use std::sync::{Arc, Mutex};
 
 // Use statements for specific items if needed
 use crate::trie::*;
@@ -10,36 +11,45 @@ use axum::{
     Router, response::{IntoResponse, Html}, http::method, extract::{Query, Path},
 };
 
+#[derive(Debug, Clone)]
+struct ModelController{
+    //I want to have a mutex on each vector
+    trie: Arc<Mutex<Trie>>,
+}
+
+//have ModelController conduct synchronization, start with no sync and a single model
+impl ModelController {
+    fn new() -> Self {
+         match Trie::new(String::from("s.txt")){
+            (Ok(mut my_trie), starting_words) => {
+                ModelController {trie: Arc::new(Mutex::new(my_trie))}
+            },
+            (Err(e), _) => unreachable!(),
+        }
+    }
+
+    
+}
+
 #[tokio::main]
 async fn main() {
-    // build our application with a single route
-    //DELETE ME LATER
-    let mut myTrie = Trie::new(String::from("s.txt"));
-    match myTrie{
-            (Ok(mut my_trie), starting_words) => {
-                my_trie.add_words(starting_words);
-                println!("number of nodes in the trie is {}", my_trie.trie_size);
-                println!("number of words in trie is {}", my_trie.num_words);
-                let my_str = String::from("BoAt");
-                let my_str2 = my_str.clone();
-                println!("Does word {my_str} exist: {}", my_trie.does_word_exist(my_str.clone()));
-                println!("Does prefix {my_str2} exist: {}", my_trie.does_prefix_exist(my_str2.clone()));
-            },
-            (Err(e), _) => print!("had error {:?}", e),
-        }
-    //DELETE ABOVE LATER
-    let app = Router::new().route("/", get(|| async { "Hello to Michael's Trie world!"}))
+    let controller = ModelController::new();
+
+   
+    axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
+                .serve(routes_crud(axum::extract::State(controller)).into_make_service())
+                .await
+                .unwrap();
+    // run it with hyper on localhost:3000
+}
+
+fn routes_crud(trie: State<ModelController>) -> Router {
+    Router::new().route("/", get(|| async { "Hello to Michael's Trie world!"}))
     .route("/prefix", get(get_prefix_search))
     .route("/wordsearch/:name", get(get_word_search))
     .route("/autocomp", get(get_auto_complete))
-    .route("/create", post(post_create_trie));
-    // .route("/new_trie", post(post_create_trie()));
-
-    // run it with hyper on localhost:3000
-    axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+    .route("/create", post(post_create_trie))
+    .with_state(trie)
 }
 
 async fn post_create_trie() -> impl IntoResponse{
@@ -59,7 +69,7 @@ async fn get_prefix_search(Query(params): Query<TestParams>) -> impl IntoRespons
     //example
     // let name = params.name.as_deref().unwrap_or("JohnSmith");
     // Html(format!("Hello <strong>{name}</strong>"))
-    
+
 
 }
 
