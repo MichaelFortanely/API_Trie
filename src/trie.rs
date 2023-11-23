@@ -2,7 +2,7 @@ use std::iter::Peekable;
 use std::fs;
 use std::collections::HashMap;
 use std::str::Chars;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::sync::RwLock;
 
 #[derive(Debug)]
@@ -219,10 +219,10 @@ impl Trie{
                 let returned_tup = self.base_trie_node._add_word(word.to_ascii_lowercase().chars());
                 num_nodes_added += returned_tup.0;
                 if returned_tup.1 == true {
-                    // println!("is a new word");
+                    // println!("{word} is a new word");
                     self.num_words += 1;
                 } else{
-                    // println!("not a new word");
+                    // println!("{word} not a new word");
                 }
                 // println!("num nodes in the tree is {}", num_nodes_added);
             }
@@ -288,120 +288,289 @@ impl Trie{
 #[derive(Debug, Clone)]
 pub struct TrieController{
     //I want to have a mutex on each vector
-    trie: Arc<Mutex<Trie>>,
+    trie: Arc<RwLock<Trie>>,
 }
 
-//have ModelController conduct synchronization, start with no sync and a single model
+//have ModelController control synchronization, start with a single trie controller by RwLock
 impl TrieController {
-    pub fn new() -> Self {
-         match Trie::new(String::from("s.txt")){
+    pub fn new(file_path: String) -> Self {
+         match Trie::new(file_path){
             (Ok(mut trie), starting_words) => {
-                TrieController {trie: Arc::new(Mutex::new(trie))}
+                TrieController {trie: Arc::new(RwLock::new(trie))}
             },
             (Err(e), _) => panic!(),
         }
     }
-    
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    //TEST FUNCTIONALITY OF TRIE
     #[test]
     fn create_empty_trie() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
+        match Trie::new("".to_string()) {
+            (Ok(mut my_trie), starting_words) => {
+                my_trie.add_words(starting_words);
+                assert_eq!(my_trie.trie_size, 0);
+                assert_eq!(my_trie.num_words, 0);
+            }, (Err(e), _) => panic!("{:?}", e),
+        }
     }
 
     #[test]
     fn create_trie_from_file() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
+        match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
+            (Ok(mut my_trie), starting_words) => {
+                my_trie.add_words(starting_words);
+                assert_eq!(my_trie.trie_size, 29);
+                assert_eq!(my_trie.num_words, 7);
+            }, (Err(e), _) => panic!("{:?}", e),
+        }
+    }
+
+    #[test]
+    fn invalid_character() {
+        match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
+            (Ok(mut my_trie), starting_words) => {
+                my_trie.add_words(starting_words);
+                assert_eq!(my_trie.trie_size, 29);
+                assert_eq!(my_trie.num_words, 7);
+            }, (Err(e), _) => {if let CustomError::UnableToOpen(inner_error) = e {
+                assert_eq!(inner_error.kind(), std::io::ErrorKind::NotFound);
+            } else {
+                panic!("Expected UnableToOpen error, but got {:?}", e);
+            }},
+        }
+    }
+
+    #[test]
+    fn no_new_line() {
+        match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
+            (Ok(mut my_trie), starting_words) => {
+                my_trie.add_words(starting_words);
+                assert_eq!(my_trie.trie_size, 29);
+                assert_eq!(my_trie.num_words, 7);
+            }, (Err(e), _) => {if let CustomError::UnableToOpen(inner_error) = e {
+                assert_eq!(inner_error.kind(), std::io::ErrorKind::NotFound);
+            } else {
+                panic!("Expected UnableToOpen error, but got {:?}", e);
+            }},
+        }
+    }
+
+    #[test]
+    fn no_blank_line() {
+        match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
+            (Ok(mut my_trie), starting_words) => {
+                my_trie.add_words(starting_words);
+                assert_eq!(my_trie.trie_size, 29);
+                assert_eq!(my_trie.num_words, 7);
+            }, (Err(e), _) => {if let CustomError::UnableToOpen(inner_error) = e {
+                assert_eq!(inner_error.kind(), std::io::ErrorKind::NotFound);
+            } else {
+                panic!("Expected UnableToOpen error, but got {:?}", e);
+            }},
+        }
     }
 
     #[test]
     fn create_trie_from_noexistent_file() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
+        match Trie::new("doesNOTexist.txt".to_string()) {
+            (Ok(_), _) => {
+                panic!();
+            }, (Err(e), _) => {if let CustomError::UnableToOpen(inner_error) = e {
+                assert_eq!(inner_error.kind(), std::io::ErrorKind::NotFound);
+            } else {
+                panic!("Expected UnableToOpen error, but got {:?}", e);
+            }},
+        }
     }
 
+    //TODO
     #[test]
     fn retrieve_all_words() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
+        match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
+            (Ok(mut my_trie), starting_words) => {
+                my_trie.add_words(starting_words);
+                assert_eq!(my_trie.trie_size, 29);
+                assert_eq!(my_trie.num_words, 7);
+            }, (Err(e), _) => panic!("{:?}", e),
+        }
     }
 
+    //TODO
     #[test]
     fn delete_all_words() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
+        match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
+            (Ok(mut my_trie), starting_words) => {
+                my_trie.add_words(starting_words);
+                assert_eq!(my_trie.trie_size, 29);
+                assert_eq!(my_trie.num_words, 7);
+            }, (Err(e), _) => panic!("{:?}", e),
+        }
     }
 
+    //TODO
     #[test]
     fn add_invalid_word() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
+        match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
+            (Ok(mut my_trie), starting_words) => {
+                my_trie.add_words(starting_words);
+                assert_eq!(my_trie.trie_size, 29);
+                assert_eq!(my_trie.num_words, 7);
+            }, (Err(e), _) => panic!("{:?}", e),
+        }
     }
 
+    //TODO
     #[test]
     fn add_uppercase_word() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
+        match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
+            (Ok(mut my_trie), starting_words) => {
+                my_trie.add_words(starting_words);
+                assert_eq!(my_trie.trie_size, 29);
+                assert_eq!(my_trie.num_words, 7);
+            }, (Err(e), _) => panic!("{:?}", e),
+        }
     }
 
+    //TODO
     #[test]
     fn prefix_search_invalid_word() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
+        match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
+            (Ok(mut my_trie), starting_words) => {
+                my_trie.add_words(starting_words);
+                assert_eq!(my_trie.trie_size, 29);
+                assert_eq!(my_trie.num_words, 7);
+            }, (Err(e), _) => panic!("{:?}", e),
+        }
     }
 
     #[test]
     fn prefix_search_valid_word() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
+        match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
+            (Ok(mut my_trie), starting_words) => {
+                my_trie.add_words(starting_words);
+                assert_eq!(my_trie.trie_size, 29);
+                assert_eq!(my_trie.num_words, 7);
+            }, (Err(e), _) => panic!("{:?}", e),
+        }
     }
 
+    //TODO
     #[test]
     fn prefix_search_uppercase_valid_word() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
+        match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
+            (Ok(mut my_trie), starting_words) => {
+                my_trie.add_words(starting_words);
+                assert_eq!(my_trie.trie_size, 29);
+                assert_eq!(my_trie.num_words, 7);
+            }, (Err(e), _) => panic!("{:?}", e),
+        }
     }
 
+    //TODO
     #[test]
     fn word_search_invalid_word() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
+        match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
+            (Ok(mut my_trie), starting_words) => {
+                my_trie.add_words(starting_words);
+                assert_eq!(my_trie.trie_size, 29);
+                assert_eq!(my_trie.num_words, 7);
+            }, (Err(e), _) => panic!("{:?}", e),
+        }
     }
 
+    //TODO
     #[test]
     fn word_search_valid_word() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
+        match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
+            (Ok(mut my_trie), starting_words) => {
+                my_trie.add_words(starting_words);
+                assert_eq!(my_trie.trie_size, 29);
+                assert_eq!(my_trie.num_words, 7);
+            }, (Err(e), _) => panic!("{:?}", e),
+        }
     }
 
+    //TODO
     #[test]
     fn word_search_uppercase_valid_word() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
+        match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
+            (Ok(mut my_trie), starting_words) => {
+                my_trie.add_words(starting_words);
+                assert_eq!(my_trie.trie_size, 29);
+                assert_eq!(my_trie.num_words, 7);
+            }, (Err(e), _) => panic!("{:?}", e),
+        }
     }
 
+    //TODO
+    #[test]
+    fn add_all_then_delete_all() {
+        match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
+            (Ok(mut my_trie), starting_words) => {
+                my_trie.add_words(starting_words);
+                assert_eq!(my_trie.trie_size, 29);
+                assert_eq!(my_trie.num_words, 7);
+            }, (Err(e), _) => panic!("{:?}", e),
+        }
+    }
+
+    //TODO
     #[test]
     fn multithread_delete_then_search() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
+        match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
+            (Ok(mut my_trie), starting_words) => {
+                my_trie.add_words(starting_words);
+                assert_eq!(my_trie.trie_size, 29);
+                assert_eq!(my_trie.num_words, 7);
+            }, (Err(e), _) => panic!("{:?}", e),
+        }
     }
 
+    ////END TEST FUNCTIONALITY OF TRIE
+
+    //TEST FUNCTIONALITY OF TRIECONTROLLER
+    //TODO
     #[test]
     fn multithread_delete_while_search() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
+        match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
+            (Ok(mut my_trie), starting_words) => {
+                my_trie.add_words(starting_words);
+                assert_eq!(my_trie.trie_size, 29);
+                assert_eq!(my_trie.num_words, 7);
+            }, (Err(e), _) => panic!("{:?}", e),
+        }
     }
 
+    //TODO
     #[test]
     fn multithread_read_ops() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
+        match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
+            (Ok(mut my_trie), starting_words) => {
+                my_trie.add_words(starting_words);
+                assert_eq!(my_trie.trie_size, 29);
+                assert_eq!(my_trie.num_words, 7);
+            }, (Err(e), _) => panic!("{:?}", e),
+        }
     }
+    
+    //TODO
+    #[test]
+    fn multithread_modify_during_read() {
+        match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
+            (Ok(mut my_trie), starting_words) => {
+                my_trie.add_words(starting_words);
+                assert_eq!(my_trie.trie_size, 29);
+                assert_eq!(my_trie.num_words, 7);
+            }, (Err(e), _) => panic!("{:?}", e),
+        }
+    }
+
+    //END TEST FUNCTIONALITY OF TRIECONTROLLER
 }
 
 // fn main() {

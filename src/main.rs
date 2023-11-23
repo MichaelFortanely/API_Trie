@@ -14,7 +14,8 @@ use axum::{
 
 #[tokio::main]
 async fn main() {
-    let controller = TrieController::new();
+    //provide a file path or don't provide a file path
+    let controller = TrieController::new("".to_string());
 
    
     axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
