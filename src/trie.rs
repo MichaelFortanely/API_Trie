@@ -91,7 +91,7 @@ impl TrieNode {
         }
     }
 
-    fn _search_tree(&self, mut chars: Peekable<Chars>, must_be_complete: bool, suffic_vec: &mut Vec<String>, get_suffixes: bool) -> bool{
+    fn _search_tree(&self, mut chars: Peekable<Chars>, must_be_complete: bool, suffic_vec: &mut Vec<String>, get_suffixes: bool, is_prefix_search: bool) -> bool{
         match chars.next() {
             Some(_) => {
                 // println!("char is {curr_char} and self.char_val is {}", self.char_val);
@@ -99,7 +99,7 @@ impl TrieNode {
                         match self.children.get(&next_char) {
                             Some(value_from_key) => {
                                 //next trie node exists
-                                return value_from_key.read().unwrap()._search_tree(chars, must_be_complete, suffic_vec, get_suffixes)
+                                return value_from_key.read().unwrap()._search_tree(chars, must_be_complete, suffic_vec, get_suffixes, is_prefix_search)
                             },
                             //no trienode for next char in iterator
                             None => return false
@@ -107,6 +107,10 @@ impl TrieNode {
                     } else{
                         //exhaustively matched all chars in iterator to trie
                         if self.is_word && must_be_complete || !must_be_complete {
+                            if is_prefix_search {
+                                println!("hereee: !self.is_word: {}", !self.is_word);
+                                return !self.is_word
+                            }
                             if get_suffixes {
                                 println!("function _auto_complete initiated");
                                 let mut mut_string = String::new();
@@ -240,12 +244,12 @@ impl Trie{
     //this function returns true only if the string is 
     //gonna need to change all of these to return custom errors
     pub fn does_prefix_exist(&self, s: String) -> bool {
-        self.base_trie_node._search_tree(("!".to_string() + &(s.to_ascii_lowercase())).chars().peekable(), false, &mut vec![], false)
+        self.base_trie_node._search_tree(("!".to_string() + &(s.to_ascii_lowercase())).chars().peekable(), false, &mut vec![], false, true)
     }
 
     //this function returns true if the word has been added to the trie
     pub fn does_word_exist(&self, s: String) -> bool {
-        self.base_trie_node._search_tree(("!".to_string() + &(s.to_ascii_lowercase())).chars().peekable(), true, &mut vec![], false)
+        self.base_trie_node._search_tree(("!".to_string() + &(s.to_ascii_lowercase())).chars().peekable(), true, &mut vec![], false, false)
     }
 
     //the two functions above have placholder vectors
@@ -254,7 +258,7 @@ impl Trie{
     //will return with blank if not even a prefix does not work
     pub fn autocomplete(&self, s: String) -> Vec<String>{
         let mut suffix_list: Vec<String> = vec![];
-        self.base_trie_node._search_tree(("!".to_string() + &(s.to_ascii_lowercase())).chars().peekable(), false, &mut suffix_list, true);
+        self.base_trie_node._search_tree(("!".to_string() + &(s.to_ascii_lowercase())).chars().peekable(), false, &mut suffix_list, true, false);
         suffix_list
     }
 
@@ -502,14 +506,14 @@ mod tests {
         }
     }
 
-    //TODO
     #[test]
     fn prefix_search_valid_word() {
         match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
             (Ok(mut my_trie), starting_words) => {
                 my_trie.add_words(starting_words);
-                assert_eq!(my_trie.trie_size, 29);
-                assert_eq!(my_trie.num_words, 7);
+                assert_eq!(my_trie.does_prefix_exist("borin".to_string()), true);
+                assert_eq!(my_trie.does_prefix_exist("boring".to_string()), false);
+                assert_eq!(my_trie.does_prefix_exist("borings".to_string()), false);
             }, (Err(e), _) => panic!("{:?}", e),
         }
     }
@@ -650,59 +654,3 @@ mod tests {
 
     //END TEST FUNCTIONALITY OF TRIECONTROLLER
 }
-
-// fn main() {
-//     println!("Hello, world!");
-//     // let first = TrieNode::new('a');
-//     // println!("{:?}",first);
-//     match Trie::new(String::from("s.txt")){
-//         (Ok(mut my_trie), starting_words) => {
-//             my_trie.add_words(starting_words);
-//             println!("number of nodes in the trie is {}", my_trie.trie_size);
-//             println!("number of words in trie is {}", my_trie.num_words);
-//             let my_str = String::from("BoAt");
-//             let my_str2 = my_str.clone();
-//             println!("Does word {my_str} exist: {}", my_trie.does_word_exist(my_str.clone()));
-//             println!("Does prefix {my_str2} exist: {}", my_trie.does_prefix_exist(my_str2.clone()));
-//             // my_trie.autocomplete("pepperyGirl".eto_string());
-//             println!("{:?}", my_trie.autocomplete(String::from("")));
-//             my_trie.delete_word(String::from("BoAt"));
-//             // let sugegestion = String::from("appalachian");
-//             // let suggestions = my_trie.autocomplete(sugegestion.clone());
-//             // println!("num_suggestions: {}; suffix list for suggestion {}: {:?}",  suggestions.len(), sugegestion.clone(), suggestions);
-//             // println!("entire dictionary: {:?}", my_trie.entire_dictionary());
-//             // println!("successful deletion of {}: {}", sugegestion.clone(), my_trie.delete_word(sugegestion.clone()));
-//             // println!("Does word {} exist: {}", sugegestion.clone(), my_trie.does_word_exist(sugegestion.clone()));
-//             // let auto_comp_after_del = String::from("ap");
-//             // let second_round_suggest =  my_trie.autocomplete(auto_comp_after_del.clone());
-//             // println!("num_suggestions: {}; suffix list for suggestion {}: {:?}",  second_round_suggest.len(), auto_comp_after_del.clone(), second_round_suggest);
-//             // println!("entire dictionary: {:?}", my_trie.entire_dictionary());
-//             // println!("number of nodes in the trie is {}", my_trie.trie_size);
-//             // println!("number of words in trie is {}", my_trie.num_words);
-//             // let third_word: String = String::from("appalachianS");
-//             // my_trie.add_words(vec![third_word.clone()]);
-//             // println!("added word {}", third_word.clone());
-//             // let third_round_suggest =  my_trie.autocomplete(auto_comp_after_del.clone());
-//             // println!("num_suggestions: {}; suffix list for suggestion {}: {:?}",  third_round_suggest.len(), third_word.clone(), third_round_suggest);
-//             // println!("entire dictionary: {:?}", my_trie.entire_dictionary());
-//             // println!("number of nodes in the trie is {}", my_trie.trie_size);
-//             // println!("number of words in trie is {}", my_trie.num_words);
-//             // //TODO figure out why number of nodes in trie is incorrect, everything else looks good tho
-//             // //TODO right unit tests before putting into an API
-//             // println!("deleting entire dictionary");
-//             // my_trie.delete_dictionary();//debug this, figure out why not working
-//             // //should be able to delete all words like this
-//             // println!("number of nodes in the trie is {}", my_trie.trie_size);
-//             // println!("number of words in trie is {}", my_trie.num_words);
-//         },
-//         (Err(e), _) => print!("had error {:?}", e),
-//     }
-    
-// }
-//1. taking in new words to add to the trie, 
-//2. giving auto complete suggestions, and 
-//3. giving a bool for if the word exists in the trie or not
-//4. size of the Trie or the number of nodes
-//What if I built an application in rust and one in python using my API
-//how to implement a trie --> do this first in sync manner and then consider async
-
