@@ -20,7 +20,8 @@ pub struct TrieNode {
     //changed implementation to use Arc from Rc to be able to use multiple threads
     //Had to make use of RwLock in order to have interior mutability of shared reference with is thread-safe,
     //because RefCell does not implement Sync Trait
-    //will be making use of Mutex to actually take care of Synchronization, will not rely on synchronization properties of RwLock at all
+    //will be making use of a single RwLock at the TrieController level (one level above the Trie Level)
+    //to actually take care of Synchronization, will not rely on synchronization properties of RwLock at all
     children: HashMap<char, Arc<RwLock<TrieNode>>>,
 }
 //having helper functions that return refernces can get really complicated
@@ -171,9 +172,9 @@ impl TrieNode {
 //base of trie is a trieNode with a value of !
 #[derive(Debug)]
 pub struct Trie {
-    pub base_trie_node: TrieNode,
-    pub trie_size: u32,
-    pub num_words: u32,
+    base_trie_node: TrieNode,
+    trie_size: u32,
+    num_words: u32,
 }
 
 impl Trie{
@@ -208,6 +209,10 @@ impl Trie{
             }, Err(e) => return (Err(CustomError::UnableToOpen(e)), vec![]),
         }
         (Ok(base_trie_node), verified_contents)
+    }
+
+    pub fn get_metadata(&self) -> (u32, u32){
+        return (self.num_words, self.trie_size);
     }
 
     pub fn add_words(&mut self, starting_words: Vec<String>){
@@ -291,7 +296,7 @@ impl Trie{
 #[derive(Debug, Clone)]
 pub struct TrieController{
     //I want to have a mutex on each vector
-    trie: Arc<RwLock<Trie>>,
+    pub trie: Arc<RwLock<Trie>>,
 }
 
 //have ModelController control synchronization, start with a single trie controller by RwLock
@@ -560,7 +565,6 @@ mod tests {
     ////END TEST FUNCTIONALITY OF TRIE
 
     //TEST FUNCTIONALITY OF TRIECONTROLLER
-    //TODO
     #[test]
     fn trie_controller_size_zero_no_input_file() {
         match TrieController::new("".to_string()) {
@@ -609,7 +613,7 @@ mod tests {
     
     //this test is at the crux of entire design
     #[test]
-    fn multithread_modify_during_read() {
+    fn multithread_rw_ops() {
         match TrieController::new("testing_txt_files/input/test2.txt".to_string()) {
             Ok(trie_controller) => {
                 let mut handles: Vec<thread::JoinHandle<()>> = vec![];
@@ -618,8 +622,9 @@ mod tests {
                     let my_ref = Arc::clone(&trie_controller.trie);
                     let copy_expected_words = expected_words.clone();
                     let handle = thread::spawn(move|| {
-                        if i == 3 {
-                            sleep(Duration::from_secs(2));
+                        if i == 3 || i == 7 {
+                            sleep(Duration::from_secs(i + 1));
+                            //make exclusive call to modify trie at different times
                             let mut my_ref = my_ref.write().unwrap();
                             my_ref.delete_dictionary();
                             assert_eq!(my_ref.trie_size, 0);
