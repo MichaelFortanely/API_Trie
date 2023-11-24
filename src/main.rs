@@ -16,13 +16,18 @@ use axum::{
 async fn main() {
     //provide a file path or don't provide a file path
     let controller = TrieController::new("".to_string());
+    match controller {
+        Ok(controller) => {
+            axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
+                        .serve(routes_crud(axum::extract::State(controller)).into_make_service())
+                        .await
+                        .unwrap();
 
-   
-    axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
-                .serve(routes_crud(axum::extract::State(controller)).into_make_service())
-                .await
-                .unwrap();
-    // run it with hyper on localhost:3000
+        },
+        Err(e) => {
+            unreachable!();
+        } 
+    }
 }
 
 fn routes_crud(trie: State<TrieController>) -> Router {

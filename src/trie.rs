@@ -214,6 +214,8 @@ impl Trie{
         //this function also needs to acquire lock
         //this will equal size of tree, but later on when calling for indiviual words
         //the return type of add_word will return interesting information
+
+        //TODO to have some sort of check for when I add invalid words, such as having new line or a number
         let mut num_nodes_added = 0;
         for word in starting_words {
                 let returned_tup = self.base_trie_node._add_word(word.to_ascii_lowercase().chars());
@@ -231,6 +233,7 @@ impl Trie{
     }
     //NOTE -> base of tree is TrieNode with value !
     //this function returns true only if the string is 
+    //gonna need to change all of these to return custom errors
     pub fn does_prefix_exist(&self, s: String) -> bool {
         self.base_trie_node._search_tree(("!".to_string() + &(s.to_ascii_lowercase())).chars().peekable(), false, &mut vec![], false)
     }
@@ -293,19 +296,25 @@ pub struct TrieController{
 
 //have ModelController control synchronization, start with a single trie controller by RwLock
 impl TrieController {
-    pub fn new(file_path: String) -> Self {
+    pub fn new(file_path: String) -> Result<Self, CustomError> {
          match Trie::new(file_path){
             (Ok(mut trie), starting_words) => {
-                TrieController {trie: Arc::new(RwLock::new(trie))}
+                trie.add_words(starting_words);
+                Ok(TrieController {trie: Arc::new(RwLock::new(trie))})
             },
-            (Err(e), _) => panic!(),
+            (Err(e), _) => Err(e),
         }
     }
 }
 
+//TODO expected behavior for spaces in word
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashSet;
+    use std::thread::{self, sleep};
+    use std::time::Duration;
 
     //TEST FUNCTIONALITY OF TRIE
     #[test]
@@ -332,45 +341,40 @@ mod tests {
 
     #[test]
     fn invalid_character() {
-        match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
-            (Ok(mut my_trie), starting_words) => {
-                my_trie.add_words(starting_words);
-                assert_eq!(my_trie.trie_size, 29);
-                assert_eq!(my_trie.num_words, 7);
-            }, (Err(e), _) => {if let CustomError::UnableToOpen(inner_error) = e {
-                assert_eq!(inner_error.kind(), std::io::ErrorKind::NotFound);
+        match Trie::new("testing_txt_files/input/invalid_char.txt".to_string()) {
+            (Ok(_), _) => unreachable!(),
+            (Err(e), _) => { if let CustomError::InvalidCharacter(_) = e {
+                assert!(true);//this means I got correct error from enum
             } else {
-                panic!("Expected UnableToOpen error, but got {:?}", e);
+                panic!("Expected InvalidCharacter error, but got {:?}", e);
             }},
         }
     }
 
     #[test]
-    fn no_new_line() {
-        match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
-            (Ok(mut my_trie), starting_words) => {
-                my_trie.add_words(starting_words);
-                assert_eq!(my_trie.trie_size, 29);
-                assert_eq!(my_trie.num_words, 7);
-            }, (Err(e), _) => {if let CustomError::UnableToOpen(inner_error) = e {
-                assert_eq!(inner_error.kind(), std::io::ErrorKind::NotFound);
-            } else {
-                panic!("Expected UnableToOpen error, but got {:?}", e);
-            }},
+    fn new_line() {
+        match Trie::new("testing_txt_files/input/newline.txt".to_string()) {
+            (Ok(_), _) => unreachable!(),
+            (Err(e), _) => {
+                if let CustomError::InvalidFormatting = e {
+                    assert!(true);//this means I got correct type of error
+                } 
+                else {
+                    panic!("Expected InvalidFormatting error, but got {:?}", e);
+                }
+            },
         }
     }
 
     #[test]
-    fn no_blank_line() {
-        match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
-            (Ok(mut my_trie), starting_words) => {
-                my_trie.add_words(starting_words);
-                assert_eq!(my_trie.trie_size, 29);
-                assert_eq!(my_trie.num_words, 7);
-            }, (Err(e), _) => {if let CustomError::UnableToOpen(inner_error) = e {
-                assert_eq!(inner_error.kind(), std::io::ErrorKind::NotFound);
-            } else {
-                panic!("Expected UnableToOpen error, but got {:?}", e);
+    fn blank_line() {
+        match Trie::new("testing_txt_files/input/blank_line.txt".to_string()) {
+            (Ok(_), _) => unreachable!(), 
+            (Err(e), _) => {if let CustomError::InvalidFormatting = e {
+                assert!(true);//this means I got correct type of error
+            } 
+            else {
+                panic!("Expected InvalidFormatting error, but got {:?}", e);
             }},
         }
     }
@@ -388,33 +392,78 @@ mod tests {
         }
     }
 
-    //TODO
     #[test]
     fn retrieve_all_words() {
-        match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
+        match Trie::new("testing_txt_files/input/test2.txt".to_string()) {
             (Ok(mut my_trie), starting_words) => {
                 my_trie.add_words(starting_words);
-                assert_eq!(my_trie.trie_size, 29);
-                assert_eq!(my_trie.num_words, 7);
+
+                let expected_words: HashSet<_> = ["replace", "redfin", "ready", "reps", "brie", "bread", "breed"].map(|x| x.to_string()).iter().cloned().collect();
+                let actual_words: HashSet<_> = my_trie.entire_dictionary().iter().cloned().collect();
+                assert_eq!(actual_words, expected_words);
             }, (Err(e), _) => panic!("{:?}", e),
         }
     }
 
-    //TODO
     #[test]
     fn delete_all_words() {
         match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
             (Ok(mut my_trie), starting_words) => {
                 my_trie.add_words(starting_words);
+                my_trie.delete_dictionary();
+                assert_eq!(my_trie.trie_size, 0);
+                assert_eq!(my_trie.num_words, 0);
+            }, (Err(e), _) => panic!("{:?}", e),
+        }
+    }
+
+    #[test]
+    fn delete_single_word_should_reduce_size() {
+        match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
+            (Ok(mut my_trie), starting_words) => {
+                my_trie.add_words(starting_words);
+                //TODO spaces and non alphanumberic characters not caught after initial trie creation
+                my_trie.delete_word("pepper".to_string());
+                assert_eq!(my_trie.trie_size, 23);
+                assert_eq!(my_trie.num_words, 6);
+            }, (Err(e), _) => panic!("{:?}", e),
+        }
+    }
+
+    #[test]
+    fn delete_multiple_words_should_not_reduce_size() {
+        match Trie::new("testing_txt_files/input/test3.txt".to_string()) {
+            (Ok(mut my_trie), starting_words) => {
+                my_trie.add_words(starting_words);
+                assert_eq!(my_trie.trie_size, 20);
+                assert_eq!(my_trie.num_words, 7);
+                my_trie.delete_word("apple".to_string());
+                my_trie.delete_word("applebot".to_string());
+                my_trie.delete_word("app".to_string());
+                my_trie.delete_word("ap".to_string());
+                assert_eq!(my_trie.trie_size, 20);
+                assert_eq!(my_trie.num_words, 3);
+            }, (Err(e), _) => panic!("{:?}", e),
+        }
+    }
+
+    //TODO
+    //TODO need a more unified way of handling invalid input then defining each independently at function level
+    #[test]
+    fn add_invalid_word() {
+        match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
+            (Ok(mut my_trie), starting_words) => {
+                my_trie.add_words(starting_words);
                 assert_eq!(my_trie.trie_size, 29);
                 assert_eq!(my_trie.num_words, 7);
+                my_trie.add_words(vec!["appstor9e".to_string()])
             }, (Err(e), _) => panic!("{:?}", e),
         }
     }
 
     //TODO
     #[test]
-    fn add_invalid_word() {
+    fn add_invalid_word_w_spaces() {
         match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
             (Ok(mut my_trie), starting_words) => {
                 my_trie.add_words(starting_words);
@@ -448,6 +497,7 @@ mod tests {
         }
     }
 
+    //TODO
     #[test]
     fn prefix_search_valid_word() {
         match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
@@ -507,68 +557,91 @@ mod tests {
         }
     }
 
-    //TODO
-    #[test]
-    fn add_all_then_delete_all() {
-        match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
-            (Ok(mut my_trie), starting_words) => {
-                my_trie.add_words(starting_words);
-                assert_eq!(my_trie.trie_size, 29);
-                assert_eq!(my_trie.num_words, 7);
-            }, (Err(e), _) => panic!("{:?}", e),
-        }
-    }
-
-    //TODO
-    #[test]
-    fn multithread_delete_then_search() {
-        match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
-            (Ok(mut my_trie), starting_words) => {
-                my_trie.add_words(starting_words);
-                assert_eq!(my_trie.trie_size, 29);
-                assert_eq!(my_trie.num_words, 7);
-            }, (Err(e), _) => panic!("{:?}", e),
-        }
-    }
-
     ////END TEST FUNCTIONALITY OF TRIE
 
     //TEST FUNCTIONALITY OF TRIECONTROLLER
     //TODO
     #[test]
-    fn multithread_delete_while_search() {
-        match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
-            (Ok(mut my_trie), starting_words) => {
-                my_trie.add_words(starting_words);
-                assert_eq!(my_trie.trie_size, 29);
-                assert_eq!(my_trie.num_words, 7);
-            }, (Err(e), _) => panic!("{:?}", e),
+    fn trie_controller_size_zero_no_input_file() {
+        match TrieController::new("".to_string()) {
+            Ok(trie_controller) => {
+                let ref_to_data = trie_controller.trie.read().unwrap();
+                assert_eq!(ref_to_data.trie_size, 0);
+                assert_eq!(ref_to_data.num_words, 0);
+            }, Err(e) => panic!("{:?}", e),
         }
     }
 
-    //TODO
+    #[test]
+    fn trie_controller_has_input_file() {
+        match TrieController::new("testing_txt_files/input/test1.txt".to_string()) {
+            Ok(trie_controller) => {
+                let ref_to_data = trie_controller.trie.read().unwrap();
+                assert_eq!(ref_to_data.trie_size, 29);
+                assert_eq!(ref_to_data.num_words, 7);
+            }, Err(e)  => panic!("{:?}", e),
+        }
+    }
+
     #[test]
     fn multithread_read_ops() {
-        match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
-            (Ok(mut my_trie), starting_words) => {
-                my_trie.add_words(starting_words);
-                assert_eq!(my_trie.trie_size, 29);
-                assert_eq!(my_trie.num_words, 7);
-            }, (Err(e), _) => panic!("{:?}", e),
+        match TrieController::new("testing_txt_files/input/test2.txt".to_string()) {
+            Ok(trie_controller) => {
+                let mut handles: Vec<thread::JoinHandle<()>> = vec![];
+                let expected_words: HashSet<_> = ["replace", "redfin", "ready", "reps", "brie", "bread", "breed"].map(|x| x.to_string()).iter().cloned().collect();
+                for _ in 0..10 {
+                    let my_ref = Arc::clone(&trie_controller.trie);
+                    let copy_expected_words = expected_words.clone();
+                    let handle = thread::spawn(move|| {
+                        let my_ref = my_ref.read().unwrap();
+                        let actual_words: HashSet<_> = my_ref.entire_dictionary().iter().cloned().collect();
+                        assert_eq!(actual_words, copy_expected_words);
+                        println!("{:?}", my_ref);
+                    });
+                    handles.push(handle);
+            }
+            for handle in handles {
+                handle.join().unwrap();
+            }
+            }, Err(e)  => panic!("{:?}", e),
         }
     }
     
-    //TODO
+    //this test is at the crux of entire design
     #[test]
     fn multithread_modify_during_read() {
-        match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
-            (Ok(mut my_trie), starting_words) => {
-                my_trie.add_words(starting_words);
-                assert_eq!(my_trie.trie_size, 29);
-                assert_eq!(my_trie.num_words, 7);
-            }, (Err(e), _) => panic!("{:?}", e),
+        match TrieController::new("testing_txt_files/input/test2.txt".to_string()) {
+            Ok(trie_controller) => {
+                let mut handles: Vec<thread::JoinHandle<()>> = vec![];
+                let expected_words: HashSet<_> = ["replace", "redfin", "ready", "reps", "brie", "bread", "breed"].map(|x| x.to_string()).iter().cloned().collect();
+                for i in 0..10 {
+                    let my_ref = Arc::clone(&trie_controller.trie);
+                    let copy_expected_words = expected_words.clone();
+                    let handle = thread::spawn(move|| {
+                        if i == 3 {
+                            sleep(Duration::from_secs(2));
+                            let mut my_ref = my_ref.write().unwrap();
+                            my_ref.delete_dictionary();
+                            assert_eq!(my_ref.trie_size, 0);
+                        } else{
+                            let my_ref = my_ref.read().unwrap();
+                            //acquire lock before going to sleep
+                            sleep(Duration::from_secs(i + 1));
+                            let actual_words: HashSet<_> = my_ref.entire_dictionary().iter().cloned().collect();
+                            assert_eq!(actual_words, copy_expected_words);
+                        }
+                    });
+                    handles.push(handle);
+            }
+            for handle in handles {
+                handle.join().unwrap();
+            }
+            }, Err(e)  => panic!("{:?}", e),
         }
     }
+
+    //TODO how should all of my methods handle invalid characters in words beyond initial trie creation?
+    //not handling it in unified way at this points
 
     //END TEST FUNCTIONALITY OF TRIECONTROLLER
 }
@@ -628,5 +701,3 @@ mod tests {
 //What if I built an application in rust and one in python using my API
 //how to implement a trie --> do this first in sync manner and then consider async
 
-
-//TODO add tests --> use this driver code to help create tests
