@@ -7,7 +7,7 @@ use serde::Deserialize;
 
 use axum::{
     routing::{get, delete, post},
-    Router, extract::{Query, Path},
+    Router, extract::Query,
 };
 
 
@@ -38,7 +38,10 @@ fn routes_crud(trie: TrieController) -> Router {
     // .route("/create", post(post_create_trie))
     .route("/metadata", get(get_trie_metdata))
     .route("/delete", delete(delete_word))
+    .route("/deletemany", delete(delete_multiple_words))
+    // .route("/clear", delete(delete_word)) //TODO deleteALL
     .route("/add", post(add_single_word))
+    .route("/addmany", post(add_multiple_words))
     .with_state(trie)
 }
 
@@ -63,26 +66,39 @@ async fn get_prefix_search(Query(params): Query<TestParams>, State(trie_controll
     let word = params.word.unwrap_or_default();
     println!("word in prefix search {word}");
     let return_bool = trie.does_prefix_exist(word);
-    axum::response::Json(serde_json::json!({
-        "is_found": return_bool
-    }))
+    match return_bool {
+        Ok(_) => {
+            axum::response::Json(serde_json::json!({
+                "is_found": return_bool
+            }))
+        },
+        Err(e) => {
+            axum::response::Json(serde_json::json!({
+                "error": e
+            }))
+        }
+    }
 }
 
-//example how to get path parms
-// async fn get_word_search(Path(name): Path<String>) -> impl IntoResponse{
-//     println!("{:?}", name);
-//     // let name = name.unwrap_or("JohnSmith");
-//     Html(format!("Hello <strong>{name}</strong>"))
-// }
 async fn get_word_search(Query(params): Query<TestParams>, State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value>{
     let trie = trie_controller.trie.read().unwrap();
     // println!("{:?}", params);
     let word = params.word.unwrap_or_default();
     println!("word in word search is {word}");
     let return_bool = trie.does_word_exist(word);
-    axum::response::Json(serde_json::json!({
-        "is_found": return_bool
-    }))
+
+    match return_bool {
+        Ok(_) => {
+            axum::response::Json(serde_json::json!({
+                "is_found": return_bool
+            }))
+        },
+        Err(e) => {
+            axum::response::Json(serde_json::json!({
+                "error": e
+            }))
+        }
+    }
 }
 
 //TODO error handling
@@ -129,5 +145,19 @@ async fn delete_word(Query(params): Query<TestParams>, State(trie_controller): S
     println!("delete_words");
     axum::response::Json(serde_json::json!({
         word : format!("deleted: {}", possibly_deleted)
+    }))
+}
+
+//TODO
+async fn add_multiple_words(Query(params): Query<TestParams>, State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value>{
+    axum::response::Json(serde_json::json!({
+        "TODO" : "add_multiple_words"
+    }))
+}
+
+//TODO
+async fn delete_multiple_words(Query(params): Query<TestParams>, State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value>{
+    axum::response::Json(serde_json::json!({
+        "TODO" : "delete_multiple_words"
     }))
 }

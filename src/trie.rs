@@ -4,12 +4,14 @@ use std::collections::HashMap;
 use std::str::Chars;
 use std::sync::Arc;
 use std::sync::RwLock;
+use serde::Serialize;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub enum CustomError {
     InvalidFormatting,
-    InvalidCharacter(char),
-    UnableToOpen(std::io::Error)
+    //invalid char in the string
+    InvalidCharacter(char, String),
+    UnableToOpen
 }
 
 //How to make this multi threaded
@@ -181,10 +183,33 @@ pub struct Trie {
     num_words: u32,
 }
 
+//modify the string in place in the vector to lowercase if valid input, otherwise return error
+//placed outside of Trie class so Trie::new could use this method
+fn validate_string(contents: &mut Vec<String>) -> Result<bool, CustomError>{
+    for content in contents.iter_mut() {
+        println!("{}", content.clone());
+        // println!("file contents: {content} len: {}", content.len());
+        if content.len() == 0 {
+            return Err(CustomError::InvalidFormatting)
+        }
+        for indv_char in content.clone().chars() {
+            if !indv_char.is_ascii_alphabetic() {
+                println!("error with {}", indv_char);
+                return Err(CustomError::InvalidCharacter(indv_char, content.to_string()));
+            } else {
+                //make lowercase
+                *content = content.to_ascii_lowercase();
+            }
+        }
+    }
+    Ok(true)
+}
 impl Trie{
+    //only accepts non-zero lengths strings with characters a-z orA-Z
     //tree will take input characters a-zA-Z, but it will be case insensitive for all methods
     //will return an empty trie if string is blank
     //otherwise for each word that is separated by a new line character, it will be added to the trie
+
     pub fn new(file_path: String) -> (Result<Self, CustomError>, Vec<String>){
         //need to read in characters from file
         let base_trie_node = Trie { base_trie_node: TrieNode { is_word: false, char_val: '!', children: HashMap::new() }, trie_size: 0, num_words: 0 };
@@ -193,26 +218,15 @@ impl Trie{
         } 
         //I will enforce that all characters must be a-z
         //first thing to do is try read from the file -> will given in the form of form data in body of API
-        let mut verified_contents: Vec<String> = Vec::new();
         match fs::read_to_string(file_path) {
             Ok(contents) => {
-                let contents = contents.split("\n");
-                for content in contents {
-                    // println!("file contents: {content} len: {}", content.len());
-                    if content.len() == 0 {
-                        return (Err(CustomError::InvalidFormatting), vec![])
-                    }
-                    for indv_char in content.chars() {
-                        if !indv_char.is_ascii_alphabetic() {
-                            println!("error with {}", indv_char);
-                            return (Err(CustomError::InvalidCharacter(indv_char)), vec![]);
-                        }
-                    }
-                    verified_contents.push(content.to_ascii_lowercase().to_string());
+                let mut contents: Vec<String> = contents.lines().map(|s| s.to_string()).collect();
+                match validate_string(&mut contents) {
+                    Ok(_) => return (Ok(base_trie_node), contents),
+                    Err(e) => return (Err(e), vec![]),
                 }
-            }, Err(e) => return (Err(CustomError::UnableToOpen(e)), vec![]),
+            }, Err(e) => return (Err(CustomError::UnableToOpen), vec![]),
         }
-        (Ok(base_trie_node), verified_contents)
     }
 
     pub fn get_metadata(&self) -> (u32, u32){
@@ -243,27 +257,42 @@ impl Trie{
     //NOTE -> base of tree is TrieNode with value !
     //this function returns true only if the string is 
     //gonna need to change all of these to return custom errors
-    pub fn does_prefix_exist(&self, s: String) -> bool {
-        self.base_trie_node._search_tree(("!".to_string() + &(s.to_ascii_lowercase())).chars().peekable(), false, &mut vec![], false, true)
+    pub fn does_prefix_exist(&self, s: String) -> Result<bool, CustomError> {
+        let mut v = vec![s];
+        match validate_string(&mut v) {
+            Ok(_) => Ok(self.base_trie_node._search_tree(("!".to_string() + &v[0]).chars().peekable(), false, &mut vec![], false, true)),
+            Err(e) => Err(e),
+        }
     }
 
     //this function returns true if the word has been added to the trie
-    pub fn does_word_exist(&self, s: String) -> bool {
-        self.base_trie_node._search_tree(("!".to_string() + &(s.to_ascii_lowercase())).chars().peekable(), true, &mut vec![], false, false)
+    //returning error for invalidly formatted words now
+    pub fn does_word_exist(&self, s: String) -> Result<bool, CustomError> {
+        let mut v = vec![s];
+        match validate_string(&mut v) {
+            Ok(_) => Ok(self.base_trie_node._search_tree(("!".to_string() + &v[0]).chars().peekable(), true, &mut vec![], false, false)),
+            Err(e) => Err(e),
+        }
     }
 
     //the two functions above have placholder vectors
     //I will do a DFS using a string that will be added to the vector that is passed in as a mutable reference so it does not need to be returned
 
     //will return with blank if not even a prefix does not work
-    pub fn autocomplete(&self, s: String) -> Vec<String>{
+    pub fn autocomplete(&self, s: String) -> Result<Vec<String>, CustomError>{
+        let mut v = vec![s];
+        match validate_string(&mut v) {
+            Ok(_) => {
         let mut suffix_list: Vec<String> = vec![];
-        self.base_trie_node._search_tree(("!".to_string() + &(s.to_ascii_lowercase())).chars().peekable(), false, &mut suffix_list, true, false);
-        suffix_list
+        self.base_trie_node._search_tree(("!".to_string() + &v[0]).chars().peekable(), false, &mut suffix_list, true, false);
+        Ok(suffix_list)
+    },
+    Err(e) => return Err(e),
+}
     }
 
     pub fn entire_dictionary(&self) -> Vec<String> {
-        self.autocomplete(String::new())
+        self.autocomplete(String::new()).unwrap()
     }
 
     //word does not exist -> do nothing
@@ -352,8 +381,10 @@ mod tests {
     fn invalid_character() {
         match Trie::new("testing_txt_files/input/invalid_char.txt".to_string()) {
             (Ok(_), _) => unreachable!(),
-            (Err(e), _) => { if let CustomError::InvalidCharacter(_) = e {
-                assert!(true);//this means I got correct error from enum
+            //retrieve the invalid 
+            (Err(e), _) => { if let CustomError::InvalidCharacter(the_char, the_string) = e {
+                assert_eq!(the_char, '9');
+                assert_eq!(the_string, "9ichael".to_string());
             } else {
                 panic!("Expected InvalidCharacter error, but got {:?}", e);
             }},
@@ -363,10 +394,14 @@ mod tests {
     #[test]
     fn new_line() {
         match Trie::new("testing_txt_files/input/newline.txt".to_string()) {
+            (Ok(_), _) => assert!(true),//should be no error
+            (Err(_), _) => unreachable!(),
+        }
+        match Trie::new("testing_txt_files/input/newline_times_two.txt".to_string()) {
             (Ok(_), _) => unreachable!(),
             (Err(e), _) => {
                 if let CustomError::InvalidFormatting = e {
-                    assert!(true);//this means I got correct type of error
+                    assert!(true);//this means I got error when there are two new lines of expected type
                 } 
                 else {
                     panic!("Expected InvalidFormatting error, but got {:?}", e);
@@ -393,8 +428,8 @@ mod tests {
         match Trie::new("doesNOTexist.txt".to_string()) {
             (Ok(_), _) => {
                 panic!();
-            }, (Err(e), _) => {if let CustomError::UnableToOpen(inner_error) = e {
-                assert_eq!(inner_error.kind(), std::io::ErrorKind::NotFound);
+            }, (Err(e), _) => {if let CustomError::UnableToOpen = e {
+                assert_eq!(true);//means I was able to get here
             } else {
                 panic!("Expected UnableToOpen error, but got {:?}", e);
             }},
