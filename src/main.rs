@@ -7,9 +7,11 @@ use serde::Deserialize;
 
 use axum::{
     routing::{get, delete, post},
-    Router, extract::Query,
+    Router, extract::Query, http::StatusCode,
+    response::{IntoResponse, Json},
 };
 //TODO JSON parsing to add multiple words, Postman API docs, user authentication
+
 
 
 #[tokio::main]
@@ -57,12 +59,39 @@ struct TestParams {
     word: Option<String>,
 }
 
-// http://localhost:3000/prefix?name=salty
+//I want to have 5 different possible outocmes
+//1. expected success
+//2. error from not includding query param
+//3. error from not giving valid input (non letterinput)
+
+// http://localhost:3000/prefix?word=salty
 //add params with key-value pairs spearated by ?
+fn verify_word_query_param(params: &TestParams, is_autocomp: bool) -> Result<bool, axum::response::Json<serde_json::Value>>{
+    match &params.word {
+        Some(w) => {
+            if w.len() == 0 && !is_autocomp{
+                Err(axum::response::Json(serde_json::json!({
+                "error": "empty 'word' parameter in the query"
+            })))
+        } else{
+            Ok(true)
+        }
+        },
+        None => Err(axum::response::Json(serde_json::json!({
+            "error": "Missing 'word' parameter in the query"
+        })))
+    }
+}
+
 async fn get_prefix_search(Query(params): Query<TestParams>, State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value>{
     let trie = trie_controller.trie.read().unwrap();
     println!("{:?}", params);
-    let word = params.word.unwrap_or_default();
+    match verify_word_query_param(&params, false) {
+        Ok(_) => {},
+        Err(e) => return e,
+    }
+    //confirmed word exists with non zero length
+    let word = params.word.unwrap();
     println!("word in prefix search {word}");
     let return_bool = trie.does_prefix_exist(word);
     match return_bool {
@@ -71,9 +100,9 @@ async fn get_prefix_search(Query(params): Query<TestParams>, State(trie_controll
                 "is_found": return_bool
             }))
         },
-        Err(e) => {
+        Err(error) => {
             axum::response::Json(serde_json::json!({
-                "error": e
+                "error": error
             }))
         }
     }
@@ -81,8 +110,13 @@ async fn get_prefix_search(Query(params): Query<TestParams>, State(trie_controll
 
 async fn get_word_search(Query(params): Query<TestParams>, State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value>{
     let trie = trie_controller.trie.read().unwrap();
-    // println!("{:?}", params);
-    let word = params.word.unwrap_or_default();
+    println!("{:?}", params);
+    match verify_word_query_param(&params, false) {
+        Ok(_) => {},
+        Err(e) => return e,
+    }
+    //confirmed word exists with non zero length
+    let word = params.word.unwrap();
     println!("word in word search is {word}");
     let return_bool = trie.does_word_exist(word);
 
@@ -112,20 +146,27 @@ async fn add_single_word(Query(params): Query<TestParams>, State(trie_controller
     }))
 }
 
-//TODO implement various error handling and status codes for methods
 async fn get_auto_complete(Query(params): Query<TestParams>, State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value>{
-    println!("do_word_search");
     let trie = trie_controller.trie.read().unwrap();
     println!("{:?}", params);
-    let word = params.word.unwrap_or_default();
+    match verify_word_query_param(&params, true) {
+        Ok(_) => {},
+        Err(e) => return e,
+    }
+    //confirmed word exists with non zero length
+    let word = params.word.unwrap();
     println!("{word}");
+    if word.len() == 0{
+        return axum::response::Json(serde_json::json!({"auto_complete": trie.entire_dictionary()}))
+    }
     let suggestions = trie.autocomplete(word);
-    axum::response::Json(serde_json::json!({
-        "auto_complete": suggestions
-    }))
+    match suggestions {
+        Ok(vec) => axum::response::Json(serde_json::json!({"auto_complete": vec})),
+        Err(e) => axum::response::Json(serde_json::json!({"error": e }))
+    }
+    
 }
 
-//TODO need to deal with invalid input coming into API
 async fn get_trie_metdata(State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value>{
     let trie = trie_controller.trie.read().unwrap();
     let metadata = trie.get_metadata();

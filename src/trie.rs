@@ -187,7 +187,7 @@ pub struct Trie {
 //placed outside of Trie class so Trie::new could use this method
 fn validate_string(contents: &mut Vec<String>) -> Result<bool, CustomError>{
     for content in contents.iter_mut() {
-        println!("{}", content.clone());
+        // println!("{}", content.clone());
         // println!("file contents: {content} len: {}", content.len());
         if content.len() == 0 {
             return Err(CustomError::InvalidFormatting)
