@@ -196,11 +196,10 @@ fn validate_string(contents: &mut Vec<String>) -> Result<bool, CustomError>{
             if !indv_char.is_ascii_alphabetic() {
                 println!("error with {}", indv_char);
                 return Err(CustomError::InvalidCharacter(indv_char, content.to_string()));
-            } else {
-                //make lowercase
-                *content = content.to_ascii_lowercase();
             }
         }
+        //make lowercase
+        *content = content.to_ascii_lowercase();
     }
     Ok(true)
 }
@@ -233,25 +232,27 @@ impl Trie{
         return (self.num_words, self.trie_size);
     }
 
-    pub fn add_words(&mut self, starting_words: Vec<String>){
-        //this function also needs to acquire lock
+    pub fn add_words(&mut self, mut starting_words: Vec<String>) -> Result<bool, CustomError>{
         //this will equal size of tree, but later on when calling for indiviual words
         //the return type of add_word will return interesting information
-
-        //TODO to have some sort of check for when I add invalid words, such as having new line or a number
-        let mut num_nodes_added = 0;
-        for word in starting_words {
-                let returned_tup = self.base_trie_node._add_word(word.to_ascii_lowercase().chars());
-                num_nodes_added += returned_tup.0;
-                if returned_tup.1 == true {
-                    // println!("{word} is a new word");
-                    self.num_words += 1;
-                } else{
-                    // println!("{word} not a new word");
+            match  validate_string(&mut starting_words){
+                Ok(_) => {
+                let mut num_nodes_added = 0;
+                for word in starting_words {
+                    let returned_tup = self.base_trie_node._add_word(word.chars());
+                    num_nodes_added += returned_tup.0;
+                    if returned_tup.1 == true {
+                        // println!("{word} is a new word");
+                        self.num_words += 1;
+                    } else{
+                        // println!("{word} not a new word");
+                    }
+                    // println!("num nodes in the tree is {}", num_nodes_added);
                 }
-                // println!("num nodes in the tree is {}", num_nodes_added);
-            }
-        self.trie_size += num_nodes_added;
+                self.trie_size += num_nodes_added;
+                Ok(true)
+            }, Err(e) => Err(e),
+        }
         // println!("num nodes in the tree is {}", self.trie_size);
     }
     //NOTE -> base of tree is TrieNode with value !
@@ -292,7 +293,9 @@ impl Trie{
     }
 
     pub fn entire_dictionary(&self) -> Vec<String> {
-        self.autocomplete(String::new()).unwrap()
+        let mut suffix_list: Vec<String> = vec![];
+        self.base_trie_node._search_tree("!".to_string().chars().peekable(), false, &mut suffix_list, true, false);
+        suffix_list
     }
 
     //word does not exist -> do nothing
@@ -301,17 +304,20 @@ impl Trie{
     //is word a leaf node -> then recursively delete all nodes until you reach a word node
     //is word not a leaf node -> then mark as not a word anymore
     //returns true if deleted, false if not deleted
-    pub fn delete_word(&mut self, s: String) -> bool{
-        //this function should acquire lock if it does not yet have
-        let return_val = self.base_trie_node._delete_from_trie(("!".to_string() + &(s.to_ascii_lowercase())).chars().peekable());
-        if return_val.0{
-            //at this point I know for sure the word exists
-            self.num_words -= 1;
-            self.trie_size -= return_val.1;
-
-        } 
-        println!("Number of nodes deleted {}", return_val.1);
-        return_val.0
+    pub fn delete_word(&mut self, s: String) -> Result<bool, CustomError>{
+        let mut v = vec![s];
+        match validate_string(&mut v) {
+        Ok(_) => {
+            let return_val = self.base_trie_node._delete_from_trie(("!".to_string() + &v[0]).chars().peekable());
+            if return_val.0{
+                //at this point I know for sure the word exists
+                self.num_words -= 1;
+                self.trie_size -= return_val.1;
+            } 
+            println!("Number of nodes deleted {}", return_val.1);
+            Ok(return_val.0)
+        }, Err(e) => Err(e)
+    }
     }
 
     //this function should acquire lock
@@ -344,8 +350,6 @@ impl TrieController {
         }
     }
 }
-
-//TODO expected behavior for spaces in word
 
 #[cfg(test)]
 mod tests {
@@ -429,7 +433,7 @@ mod tests {
             (Ok(_), _) => {
                 panic!();
             }, (Err(e), _) => {if let CustomError::UnableToOpen = e {
-                assert_eq!(true);//means I was able to get here
+                assert!(true);//means I was able to get here
             } else {
                 panic!("Expected UnableToOpen error, but got {:?}", e);
             }},
@@ -462,11 +466,30 @@ mod tests {
     }
 
     #[test]
+    fn delete_invalid_word() {
+        match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
+            (Ok(mut my_trie), starting_words) => {
+                my_trie.add_words(starting_words);
+                match my_trie.delete_word("salty man".to_string()) {
+                    Ok(_) => unreachable!(),
+                    Err(e) => {
+                        if let CustomError::InvalidCharacter(c, s) = e {
+                            assert_eq!(' ', c);
+                            assert_eq!(s, "salty man".to_string());
+                        } else{
+                            unreachable!();
+                        }
+                    }
+                }
+            }, (Err(e), _) => panic!("{:?}", e),
+        }
+    }
+
+    #[test]
     fn delete_single_word_should_reduce_size() {
         match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
             (Ok(mut my_trie), starting_words) => {
                 my_trie.add_words(starting_words);
-                //TODO spaces and non alphanumberic characters not caught after initial trie creation
                 my_trie.delete_word("pepper".to_string());
                 assert_eq!(my_trie.trie_size, 23);
                 assert_eq!(my_trie.num_words, 6);
@@ -491,28 +514,42 @@ mod tests {
         }
     }
 
-    //TODO
-    //TODO need a more unified way of handling invalid input then defining each independently at function level
     #[test]
     fn add_invalid_word() {
         match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
             (Ok(mut my_trie), starting_words) => {
                 my_trie.add_words(starting_words);
-                assert_eq!(my_trie.trie_size, 29);
-                assert_eq!(my_trie.num_words, 7);
-                my_trie.add_words(vec!["appstor9e".to_string()])
+                match my_trie.add_words(vec!["saltyman".to_string(), "appstor+E".to_string()]) {
+                    Ok(_) => unreachable!(),
+                    Err(e) => {
+                        if let CustomError::InvalidCharacter(c, s) = e {
+                            assert_eq!('+', c);
+                            assert_eq!(s, "appstor+E".to_string());
+                        } else{
+                            unreachable!();
+                        }
+                    }
+                }
             }, (Err(e), _) => panic!("{:?}", e),
         }
     }
 
-    //TODO
     #[test]
     fn add_invalid_word_w_spaces() {
         match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
             (Ok(mut my_trie), starting_words) => {
                 my_trie.add_words(starting_words);
-                assert_eq!(my_trie.trie_size, 29);
-                assert_eq!(my_trie.num_words, 7);
+                match my_trie.add_words(vec!["peppery   giRL".to_string()]) {
+                    Ok(_) => unreachable!(),
+                    Err(e) => {
+                        if let CustomError::InvalidCharacter(c, s) = e {
+                            assert_eq!(' ', c);
+                            assert_eq!(s, "peppery   giRL".to_string());
+                        } else{
+                            unreachable!();
+                        }
+                    }
+                }
             }, (Err(e), _) => panic!("{:?}", e),
         }
     }
@@ -529,14 +566,22 @@ mod tests {
         }
     }
 
-    //TODO
     #[test]
     fn prefix_search_invalid_word() {
         match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
             (Ok(mut my_trie), starting_words) => {
                 my_trie.add_words(starting_words);
-                assert_eq!(my_trie.trie_size, 29);
-                assert_eq!(my_trie.num_words, 7);
+                match my_trie.does_prefix_exist("pepper is my cat".to_string()) {
+                    Ok(_) => unreachable!(),
+                    Err(e) => {
+                        if let CustomError::InvalidCharacter(c, s) = e {
+                            assert_eq!(' ', c);
+                            assert_eq!(s, "pepper is my cat".to_string());
+                        } else{
+                            unreachable!();
+                        }
+                    }
+                }
             }, (Err(e), _) => panic!("{:?}", e),
         }
     }
@@ -546,57 +591,78 @@ mod tests {
         match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
             (Ok(mut my_trie), starting_words) => {
                 my_trie.add_words(starting_words);
-                assert_eq!(my_trie.does_prefix_exist("borin".to_string()), true);
-                assert_eq!(my_trie.does_prefix_exist("boring".to_string()), false);
-                assert_eq!(my_trie.does_prefix_exist("borings".to_string()), false);
+                match my_trie.does_prefix_exist("borin".to_string()) {
+                    Ok(bool) => assert_eq!(bool, true),
+                    Err(_) => unreachable!(),
+                }match my_trie.does_prefix_exist("boring".to_string()) {
+                    Ok(bool) => assert_eq!(bool, false),
+                    Err(_) => unreachable!(),
+                }
+                match my_trie.does_prefix_exist("borings".to_string()) {
+                    Ok(bool) => assert_eq!(bool, false),
+                    Err(_) => unreachable!(),
+                }
             }, (Err(e), _) => panic!("{:?}", e),
         }
     }
 
-    //TODO
     #[test]
     fn prefix_search_uppercase_valid_word() {
         match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
             (Ok(mut my_trie), starting_words) => {
                 my_trie.add_words(starting_words);
+                match my_trie.does_prefix_exist("appL".to_string()) {
+                    Ok(_) => assert!(true),
+                    Err(_) => unreachable!(),
+                }
                 assert_eq!(my_trie.trie_size, 29);
                 assert_eq!(my_trie.num_words, 7);
             }, (Err(e), _) => panic!("{:?}", e),
         }
     }
 
-    //TODO
     #[test]
     fn word_search_invalid_word() {
         match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
             (Ok(mut my_trie), starting_words) => {
                 my_trie.add_words(starting_words);
-                assert_eq!(my_trie.trie_size, 29);
-                assert_eq!(my_trie.num_words, 7);
+                match my_trie.does_word_exist("AP7S".to_string()) {
+                    Ok(_) => unreachable!(),
+                    Err(e) => {
+                        if let CustomError::InvalidCharacter(c, s) = e {
+                            assert_eq!('7', c);
+                            assert_eq!(s, "AP7S".to_string());
+                        } else{
+                            unreachable!();
+                        }
+                    }
+                }
             }, (Err(e), _) => panic!("{:?}", e),
         }
     }
 
-    //TODO
     #[test]
-    fn word_search_valid_word() {
+    fn word_search_nonexistent_word() {
         match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
             (Ok(mut my_trie), starting_words) => {
                 my_trie.add_words(starting_words);
-                assert_eq!(my_trie.trie_size, 29);
-                assert_eq!(my_trie.num_words, 7);
+                match my_trie.does_word_exist("APpS".to_string()) {
+                    Ok(bool) => assert_eq!(false, bool),
+                    Err(_) => unreachable!(),
+                }
             }, (Err(e), _) => panic!("{:?}", e),
         }
     }
 
-    //TODO
     #[test]
     fn word_search_uppercase_valid_word() {
         match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
             (Ok(mut my_trie), starting_words) => {
                 my_trie.add_words(starting_words);
-                assert_eq!(my_trie.trie_size, 29);
-                assert_eq!(my_trie.num_words, 7);
+                match my_trie.does_word_exist("APPlE".to_string()) {
+                    Ok(_) => assert!(true),
+                    Err(_) => unreachable!(),
+                }
             }, (Err(e), _) => panic!("{:?}", e),
         }
     }
@@ -683,9 +749,6 @@ mod tests {
             }, Err(e)  => panic!("{:?}", e),
         }
     }
-
-    //TODO how should all of my methods handle invalid characters in words beyond initial trie creation?
-    //not handling it in unified way at this points
 
     //END TEST FUNCTIONALITY OF TRIECONTROLLER
 }

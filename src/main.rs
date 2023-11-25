@@ -9,7 +9,7 @@ use axum::{
     routing::{get, delete, post},
     Router, extract::Query,
 };
-
+//TODO JSON parsing to add multiple words, Postman API docs, user authentication
 
 
 #[tokio::main]
@@ -38,7 +38,6 @@ fn routes_crud(trie: TrieController) -> Router {
     // .route("/create", post(post_create_trie))
     .route("/metadata", get(get_trie_metdata))
     .route("/delete", delete(delete_word))
-    .route("/deletemany", delete(delete_multiple_words))
     // .route("/clear", delete(delete_word)) //TODO deleteALL
     .route("/add", post(add_single_word))
     .route("/addmany", post(add_multiple_words))
@@ -141,7 +140,7 @@ async fn get_trie_metdata(State(trie_controller): State<TrieController>) -> axum
 async fn delete_word(Query(params): Query<TestParams>, State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value>{
     let mut trie = trie_controller.trie.write().unwrap();
     let word = params.word.unwrap_or_default();
-    let possibly_deleted = trie.delete_word(word.clone());
+    let possibly_deleted = trie.delete_word(word.clone()).unwrap();
     println!("delete_words");
     axum::response::Json(serde_json::json!({
         word : format!("deleted: {}", possibly_deleted)
@@ -152,12 +151,5 @@ async fn delete_word(Query(params): Query<TestParams>, State(trie_controller): S
 async fn add_multiple_words(Query(params): Query<TestParams>, State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value>{
     axum::response::Json(serde_json::json!({
         "TODO" : "add_multiple_words"
-    }))
-}
-
-//TODO
-async fn delete_multiple_words(Query(params): Query<TestParams>, State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value>{
-    axum::response::Json(serde_json::json!({
-        "TODO" : "delete_multiple_words"
     }))
 }
