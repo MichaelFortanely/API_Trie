@@ -338,7 +338,7 @@ pub struct TrieController{
     //I want to have a mutex on each vector
     // pub trie: Arc<RwLock<Trie>>,
     //using UUID's converted to string as keys, and Tries as the values (1 trie mapped to each uuid)
-    pub trie_map: HashMap<Uuid, Arc<RwLock<Trie>>>
+    pub trie_map: Arc<RwLock<HashMap<Uuid, Arc<RwLock<Trie>>>>>
 }
 
 //have ModelController control synchronization, start with a single trie controller by RwLock
@@ -349,11 +349,25 @@ impl TrieController {
                 trie.add_words(starting_words);
                 let mut trie_map = HashMap::new();
                 trie_map.insert(Uuid::new_v4(), Arc::new(RwLock::new(trie)));
-                println!("trie_map at initialization {:?}", trie_map);
-                Ok(TrieController {trie_map})
+                // println!("trie_map at initialization {:?}", trie_map);
+                Ok(TrieController {trie_map: Arc::new(RwLock::new(trie_map))})
             },
             (Err(e), _) => Err(e),
         }
+    }
+
+    //
+    pub fn retrieve_trie_with_uuid_mut(&self, key: Uuid) -> Result<Trie, String> {
+        Err("TODO".to_string())
+    }
+
+    pub fn retrieve_trie_with_uuid(&self, key: Uuid) -> Result<Trie, String> {
+        Err("TODO".to_string())
+    }
+
+    //create new uuid with each post
+    pub fn create_new_trie(&mut self) -> Uuid {
+        Uuid::new_v4()
     }
 }
 
@@ -680,14 +694,12 @@ mod tests {
     fn trie_controller_size_zero_no_input_file() {
         match TrieController::new("".to_string()) {
             Ok(trie_controller) => {
-                if let Some((key, value)) = trie_controller.trie_map.iter().next() {
-                    println!("Key: {}", key);
-                let ref_to_data = trie_controller.trie_map.get(key).unwrap().read().unwrap();
+                let read_map = trie_controller.trie_map.read().unwrap();
+                let key = read_map.iter().next().unwrap().0;
+                println!("Key: {}", key);
+                let ref_to_data = read_map.get(key).unwrap().read().unwrap();
                 assert_eq!(ref_to_data.trie_size, 0);
                 assert_eq!(ref_to_data.num_words, 0);
-                }else {
-                    panic!();
-                }
             }, Err(e) => panic!("{:?}", e),
         }
     }
@@ -696,14 +708,12 @@ mod tests {
     fn trie_controller_has_input_file() {
         match TrieController::new("testing_txt_files/input/test1.txt".to_string()) {
             Ok(trie_controller) => {
-                if let Some((key, value)) = trie_controller.trie_map.iter().next() {
-                    println!("Key: {}", key);
-                let ref_to_data = trie_controller.trie_map.get(key).unwrap().read().unwrap();
+                let read_map = trie_controller.trie_map.read().unwrap();
+                let key = read_map.iter().next().unwrap().0;
+                println!("Key: {}", key);
+                let ref_to_data = read_map.get(key).unwrap().read().unwrap();
                 assert_eq!(ref_to_data.trie_size, 29);
                 assert_eq!(ref_to_data.num_words, 7);
-                }else {
-                    panic!();
-                }
             }, Err(e)  => panic!("{:?}", e),
         }
     }
@@ -714,9 +724,10 @@ mod tests {
             Ok(trie_controller) => {
                 let mut handles: Vec<thread::JoinHandle<()>> = vec![];
                 let expected_words: HashSet<_> = ["replace", "redfin", "ready", "reps", "brie", "bread", "breed"].map(|x| x.to_string()).iter().cloned().collect();
-                let key = trie_controller.trie_map.iter().next().unwrap().0;
+                let read_map = trie_controller.trie_map.read().unwrap();
+                let key = read_map.iter().next().unwrap().0;
                 for _ in 0..10 {
-                    let my_ref = Arc::clone(&trie_controller.trie_map.get(key).unwrap());
+                    let my_ref = Arc::clone(&read_map.get(key).unwrap());
                     let copy_expected_words = expected_words.clone();
                     let handle = thread::spawn(move|| {
                         let my_ref = my_ref.read().unwrap();
@@ -740,9 +751,10 @@ mod tests {
             Ok(trie_controller) => {
                 let mut handles: Vec<thread::JoinHandle<()>> = vec![];
                 let expected_words: HashSet<_> = ["replace", "redfin", "ready", "reps", "brie", "bread", "breed"].map(|x| x.to_string()).iter().cloned().collect();
-                let key = trie_controller.trie_map.iter().next().unwrap().0;
+                let read_map = trie_controller.trie_map.read().unwrap();
+                let key = read_map.iter().next().unwrap().0;
                 for i in 0..10 {
-                    let my_ref = Arc::clone(&trie_controller.trie_map.get(key).unwrap());
+                    let my_ref = Arc::clone(&read_map.get(key).unwrap());
                     let copy_expected_words = expected_words.clone();
                     let handle = thread::spawn(move|| {
                         if i == 3 || i == 7 {
@@ -767,6 +779,8 @@ mod tests {
             }, Err(e)  => panic!("{:?}", e),
         }
     }
+
+    //create another test where I can do any other function besides 
 
     //END TEST FUNCTIONALITY OF TRIECONTROLLER
 }
