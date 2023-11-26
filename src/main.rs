@@ -7,7 +7,9 @@ use serde::Deserialize;
 
 use axum::{
     routing::{get, delete, post},
-    Router, extract::Query, extract::Json
+    Router,
+    Form,
+    extract::Query,
 };
 //TODO JSON parsing to add multiple words, Postman API docs, user authentication
 
@@ -38,9 +40,9 @@ fn routes_crud(trie: TrieController) -> Router {
     .route("/autocomp", get(get_auto_complete))
     // .route("/create", post(post_create_trie))
     .route("/metadata", get(get_trie_metdata))
+    .route("/addmany", post(add_multiple_words))
     .route("/delete", delete(delete_word))
     // .route("/clear", delete(delete_word)) //TODO deleteALL
-    .route("/addmany", post(add_multiple_words))
     .route("/add", post(add_single_word))
     .with_state(trie)
 }
@@ -210,16 +212,22 @@ async fn delete_word(Query(params): Query<TestParams>, State(trie_controller): S
     }
     
 }
+#[derive(Debug, Deserialize)]
 struct AddWordsRequest {
-    words: Vec<String>,
+    words: String,
 }
 
-//TODO
-async fn add_multiple_words(State(trie_controller): State<TrieController>, Json(payload): Json<AddWordsRequest>) -> axum::response::Json<serde_json::Value>{
+async fn add_multiple_words( 
+    State(trie_controller): State<TrieController>,
+    Form(sign_up): Form<AddWordsRequest>
+) -> axum::response::Json<serde_json::Value>{
+    // println!("sign_up is {:?}", sign_up);
+    let mut words = sign_up.words.lines().map(|s| s.to_string()).collect();
+    // println!("words are {:?}", words);
+    
     let mut trie = trie_controller.trie.write().unwrap();
    
     let (num_words_before, trie_size_before) = trie.get_metadata();
-    let words = payload.words.clone();
 
     let result = trie.add_words(words);
     match result {
