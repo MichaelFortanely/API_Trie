@@ -7,8 +7,7 @@ use serde::Deserialize;
 
 use axum::{
     routing::{get, delete, post},
-    Router, extract::Query, http::StatusCode,
-    response::{IntoResponse, Json},
+    Router, extract::Query, extract::Json
 };
 //TODO JSON parsing to add multiple words, Postman API docs, user authentication
 
@@ -17,7 +16,7 @@ use axum::{
 #[tokio::main]
 async fn main() {
     //provide a file path or don't provide a file path
-    let controller = TrieController::new("testing_txt_files/input/test1.txt".to_string());
+    let controller = TrieController::new("s.txt".to_string());
     match controller {
         Ok(controller) => {
             axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
@@ -41,8 +40,8 @@ fn routes_crud(trie: TrieController) -> Router {
     .route("/metadata", get(get_trie_metdata))
     .route("/delete", delete(delete_word))
     // .route("/clear", delete(delete_word)) //TODO deleteALL
-    .route("/add", post(add_single_word))
     .route("/addmany", post(add_multiple_words))
+    .route("/add", post(add_single_word))
     .with_state(trie)
 }
 
@@ -59,7 +58,7 @@ struct TestParams {
     word: Option<String>,
 }
 
-//I want to have 5 different possible outocmes
+//I want to have 3 different possible outocmes
 //1. expected success
 //2. error from not includding query param
 //3. error from not giving valid input (non letterinput)
@@ -134,16 +133,29 @@ async fn get_word_search(Query(params): Query<TestParams>, State(trie_controller
     }
 }
 
-//TODO error handling
 async fn add_single_word(Query(params): Query<TestParams>, State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value> {
     let mut trie = trie_controller.trie.write().unwrap();
+    println!("{:?}", params);
+    match verify_word_query_param(&params, false) {
+        Ok(_) => {},
+        Err(e) => return e,
+    }
+    //confirmed word exists with non zero length
     let word = params.word.unwrap();
     let trie_size_before = trie.get_metadata().1;
-    trie.add_words(vec![word.clone()]);
-    println!("delete_words");
-    axum::response::Json(serde_json::json!({
-        word : format!("number of nodes added: {}", trie.get_metadata().1 - trie_size_before)
-    }))
+    let result = trie.add_words(vec![word.clone()]);
+    match result {
+        Ok(_) => {
+            axum::response::Json(serde_json::json!({
+                word : format!("number of nodes added: {}", trie.get_metadata().1 - trie_size_before)
+            }))
+        },
+        Err(e) => {
+            axum::response::Json(serde_json::json!({
+                "error": e
+            }))
+        }
+    }
 }
 
 async fn get_auto_complete(Query(params): Query<TestParams>, State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value>{
@@ -177,20 +189,51 @@ async fn get_trie_metdata(State(trie_controller): State<TrieController>) -> axum
     }))
 }
 
-//TODO this might be more informative if returned the number of nodes deleted
 async fn delete_word(Query(params): Query<TestParams>, State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value>{
     let mut trie = trie_controller.trie.write().unwrap();
-    let word = params.word.unwrap_or_default();
-    let possibly_deleted = trie.delete_word(word.clone()).unwrap();
-    println!("delete_words");
-    axum::response::Json(serde_json::json!({
-        word : format!("deleted: {}", possibly_deleted)
-    }))
+    println!("{:?}", params);
+    match verify_word_query_param(&params, false) {
+        Ok(_) => {},
+        Err(e) => return e,
+    }
+    //confirmed word exists with non zero length
+    let word = params.word.unwrap();
+    match trie.delete_word(word.clone()){
+        Ok(possibly_deleted) => axum::response::Json(serde_json::json!({
+            word : format!("was deleted?: {}", possibly_deleted)
+        })),
+        Err(e) => {
+            axum::response::Json(serde_json::json!({
+                "error": e
+            }))
+        },
+    }
+    
+}
+struct AddWordsRequest {
+    words: Vec<String>,
 }
 
 //TODO
-async fn add_multiple_words(Query(params): Query<TestParams>, State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value>{
-    axum::response::Json(serde_json::json!({
-        "TODO" : "add_multiple_words"
-    }))
+async fn add_multiple_words(State(trie_controller): State<TrieController>, Json(payload): Json<AddWordsRequest>) -> axum::response::Json<serde_json::Value>{
+    let mut trie = trie_controller.trie.write().unwrap();
+   
+    let (num_words_before, trie_size_before) = trie.get_metadata();
+    let words = payload.words.clone();
+
+    let result = trie.add_words(words);
+    match result {
+        Ok(_) => {
+            let (num_words_after, trie_size_after) = trie.get_metadata();
+            axum::response::Json(serde_json::json!({
+                "nodes added": format!("{}", trie_size_after - trie_size_before),
+                "words added": format!("{}", num_words_after - num_words_before),
+            }))
+        },
+        Err(e) => {
+            axum::response::Json(serde_json::json!({
+                "error": e
+            }))
+        }
+    }
 }
