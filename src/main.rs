@@ -4,6 +4,7 @@ use axum::extract::State;
 // Use statements for specific items if needed
 use crate::trie::*;
 use serde::Deserialize;
+use uuid::Uuid;
 
 use axum::{
     routing::{get, delete, post},
@@ -38,22 +39,25 @@ fn routes_crud(trie: TrieController) -> Router {
     .route("/prefix", get(get_prefix_search))
     .route("/wordsearch", get(get_word_search))
     .route("/autocomp", get(get_auto_complete))
-    // .route("/create", post(post_create_trie))
+    .route("/create", post(post_create_trie))
     .route("/metadata", get(get_trie_metdata))
     .route("/addmany", post(add_multiple_words))
     .route("/delete", delete(delete_word))
-    // .route("/clear", delete(delete_word)) //TODO deleteALL
+    .route("/clear", delete(delete_all)) //TODO deleteALL
     .route("/add", post(add_single_word))
     .with_state(trie)
 }
 
+
+//
 //TODO if want to allow users to have unique Trie, will need to redesign TrieController to allow for multiple Tries to exist instead of just one
-// async fn post_create_trie(State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value>{
-//     println!("patch add_words");
-//     axum::response::Json(serde_json::json!({
-//         "TODO": "post_create_trie"
-//     }))
-// }
+async fn post_create_trie(State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value>{
+    println!("post add_words");
+    axum::response::Json(serde_json::json!({
+        "TODO": "post_create_trie",
+        "your-uuid": Uuid::new_v4().to_string(),
+    }))
+}
 
 #[derive(Debug, Deserialize)]
 struct TestParams {
@@ -85,7 +89,7 @@ fn verify_word_query_param(params: &TestParams, is_autocomp: bool) -> Result<boo
 }
 
 async fn get_prefix_search(Query(params): Query<TestParams>, State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value>{
-    let trie = trie_controller.trie.read().unwrap();
+    let trie = trie_controller.trie_map.get(&Uuid::new_v4()).unwrap().read().unwrap();
     println!("{:?}", params);
     match verify_word_query_param(&params, false) {
         Ok(_) => {},
@@ -110,7 +114,7 @@ async fn get_prefix_search(Query(params): Query<TestParams>, State(trie_controll
 }
 
 async fn get_word_search(Query(params): Query<TestParams>, State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value>{
-    let trie = trie_controller.trie.read().unwrap();
+    let trie = trie_controller.trie_map.get(&Uuid::new_v4()).unwrap().read().unwrap();
     println!("{:?}", params);
     match verify_word_query_param(&params, false) {
         Ok(_) => {},
@@ -136,7 +140,7 @@ async fn get_word_search(Query(params): Query<TestParams>, State(trie_controller
 }
 
 async fn add_single_word(Query(params): Query<TestParams>, State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value> {
-    let mut trie = trie_controller.trie.write().unwrap();
+    let mut trie = trie_controller.trie_map.get(&Uuid::new_v4()).unwrap().write().unwrap();
     println!("{:?}", params);
     match verify_word_query_param(&params, false) {
         Ok(_) => {},
@@ -161,7 +165,7 @@ async fn add_single_word(Query(params): Query<TestParams>, State(trie_controller
 }
 
 async fn get_auto_complete(Query(params): Query<TestParams>, State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value>{
-    let trie = trie_controller.trie.read().unwrap();
+    let trie = trie_controller.trie_map.get(&Uuid::new_v4()).unwrap().read().unwrap();
     println!("{:?}", params);
     match verify_word_query_param(&params, true) {
         Ok(_) => {},
@@ -182,7 +186,8 @@ async fn get_auto_complete(Query(params): Query<TestParams>, State(trie_controll
 }
 
 async fn get_trie_metdata(State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value>{
-    let trie = trie_controller.trie.read().unwrap();
+    let trie = trie_controller.trie_map.get(&Uuid::new_v4()).unwrap().read().unwrap();
+    //TODO implement error handling for UUID, just trying to get this file to compile for now
     let metadata = trie.get_metadata();
     //return number of words, number of nodes
     axum::response::Json(serde_json::json!({
@@ -192,7 +197,7 @@ async fn get_trie_metdata(State(trie_controller): State<TrieController>) -> axum
 }
 
 async fn delete_word(Query(params): Query<TestParams>, State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value>{
-    let mut trie = trie_controller.trie.write().unwrap();
+    let mut trie = trie_controller.trie_map.get(&Uuid::new_v4()).unwrap().write().unwrap();
     println!("{:?}", params);
     match verify_word_query_param(&params, false) {
         Ok(_) => {},
@@ -210,8 +215,20 @@ async fn delete_word(Query(params): Query<TestParams>, State(trie_controller): S
             }))
         },
     }
-    
 }
+
+async fn delete_all(State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value>{
+    let mut trie = trie_controller.trie_map.get(&Uuid::new_v4()).unwrap().write().unwrap();
+    let (num_words_before, trie_size_before) = trie.get_metadata();
+    trie.delete_dictionary();
+    let (num_words_after, trie_size_after) = trie.get_metadata();
+    axum::response::Json(serde_json::json!({
+        "nodes deleted": format!("{}",  trie_size_before - trie_size_after),
+        "words deleted": format!("{}",  num_words_before - num_words_after),
+    }))
+}
+
+
 #[derive(Debug, Deserialize)]
 struct AddWordsRequest {
     words: String,
@@ -225,7 +242,7 @@ async fn add_multiple_words(
     let mut words = sign_up.words.lines().map(|s| s.to_string()).collect();
     // println!("words are {:?}", words);
     
-    let mut trie = trie_controller.trie.write().unwrap();
+    let mut trie = trie_controller.trie_map.get(&Uuid::new_v4()).unwrap().write().unwrap();
    
     let (num_words_before, trie_size_before) = trie.get_metadata();
 
