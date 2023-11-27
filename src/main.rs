@@ -65,8 +65,7 @@ async fn post_create_trie(State(trie_controller): State<TrieController>) -> axum
         Err(_) => panic!(),
     })));
     axum::response::Json(serde_json::json!({
-        "TODO": "post_create_trie",
-        "your-uuid": your_new_key,
+        "uuid": your_new_key,
     }))
 }
 
@@ -75,11 +74,18 @@ async fn delete_trie(Path(word): Path<String>, State(trie_controller): State<Tri
     println!("Item ID: {:?}\n", word);
     let mut trie_map = trie_controller.trie_map.write().unwrap();
     let your_new_key = Uuid::new_v4();
-    trie_map.remove(&your_new_key.to_string());
-    axum::response::Json(serde_json::json!({
-        "TODO": "delete_trie",
-        "your-uuid": your_new_key.to_string(),
-    }))
+    match trie_map.get(&word) {
+        None => return axum::response::Json(serde_json::json!({
+            "invalid id": word
+        })),
+        Some(trie) => {
+            trie.write().unwrap().delete_dictionary();
+            trie_map.remove(&your_new_key.to_string());
+            axum::response::Json(serde_json::json!({
+                "your-uuid": your_new_key.to_string(),
+            }))
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -119,7 +125,13 @@ fn verify_word_query_param(params: &Params, is_autocomp: bool) -> Result<bool, a
 async fn get_prefix_search(Path(word): Path<String>, Query(params): Query<Params>, State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value>{
     println!("Item ID: {:?}\n", word);
     let trie_map = trie_controller.trie_map.read().unwrap();
-    let trie = trie_map.get(&Uuid::new_v4().to_string()).unwrap().read().unwrap();
+    match trie_map.get(&word) {
+        None => return axum::response::Json(serde_json::json!({
+            "invalid id": word
+        })),
+        Some(trie) => {
+            let trie = trie.read().unwrap();
+            
     println!("{:?}", params);
     match verify_word_query_param(&params, false) {
         Ok(_) => {},
@@ -140,13 +152,19 @@ async fn get_prefix_search(Path(word): Path<String>, Query(params): Query<Params
                 "error": error
             }))
         }
-    }
+    }}}
 }
 
 //create a RwLock on the hashmap itself, and only need a mutable instance for post method, otherwise just need a read
 async fn get_word_search(Path(word): Path<String>, Query(params): Query<Params>, State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value>{
     let trie_map = trie_controller.trie_map.read().unwrap();
-    let trie = trie_map.get(&Uuid::new_v4().to_string()).unwrap().read().unwrap();
+    match trie_map.get(&word) {
+        None => return axum::response::Json(serde_json::json!({
+            "invalid id": word
+        })),
+        Some(trie) => {
+            let trie = trie.read().unwrap();
+          
     println!("{:?}", params);
     match verify_word_query_param(&params, false) {
         Ok(_) => {},
@@ -169,11 +187,17 @@ async fn get_word_search(Path(word): Path<String>, Query(params): Query<Params>,
             }))
         }
     }
-}
+}}}
 
 async fn add_single_word(Path(word): Path<String>, Query(params): Query<Params>, State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value> {
     let trie_map = trie_controller.trie_map.read().unwrap();
-    let mut trie = trie_map.get(&Uuid::new_v4().to_string()).unwrap().write().unwrap();
+    match trie_map.get(&word) {
+        None => return axum::response::Json(serde_json::json!({
+            "invalid id": word
+        })),
+        Some(trie) => {
+            let mut trie = trie.write().unwrap();
+            
     println!("{:?}", params);
     match verify_word_query_param(&params, false) {
         Ok(_) => {},
@@ -194,12 +218,18 @@ async fn add_single_word(Path(word): Path<String>, Query(params): Query<Params>,
                 "error": e
             }))
         }
-    }
+    }}}
 }
 
 async fn get_auto_complete(Path(word): Path<String>, Query(params): Query<Params>, State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value>{
     let trie_map = trie_controller.trie_map.read().unwrap();
-    let trie = trie_map.get(&Uuid::new_v4().to_string()).unwrap().read().unwrap();
+    match trie_map.get(&word) {
+        None => return axum::response::Json(serde_json::json!({
+            "invalid id": word
+        })),
+        Some(trie) => {
+            let trie = trie.read().unwrap();
+          
     println!("{:?}", params);
     match verify_word_query_param(&params, true) {
         Ok(_) => {},
@@ -216,12 +246,18 @@ async fn get_auto_complete(Path(word): Path<String>, Query(params): Query<Params
         Ok(vec) => axum::response::Json(serde_json::json!({"auto_complete": vec})),
         Err(e) => axum::response::Json(serde_json::json!({"error": e }))
     }
-    
+}}
 }
 
 async fn get_trie_metdata(Path(word): Path<String>, State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value>{
     let trie_map = trie_controller.trie_map.read().unwrap();
-    let trie = trie_map.get(&Uuid::new_v4().to_string()).unwrap().read().unwrap();
+    match trie_map.get(&word) {
+        None => return axum::response::Json(serde_json::json!({
+            "invalid id": word
+        })),
+        Some(trie) => {
+            let trie = trie.read().unwrap();
+          
     //TODO implement error handling for UUID, just trying to get this file to compile for now
     let metadata = trie.get_metadata();
     //return number of words, number of nodes
@@ -229,12 +265,18 @@ async fn get_trie_metdata(Path(word): Path<String>, State(trie_controller): Stat
         "num_words": metadata.0,
         "num_trie_nodes": metadata.1
     }))
-}
+}}}
 
 async fn delete_word(Path(word): Path<String>, Query(params): Query<Params>, State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value>{
     // trie_controller.create_new_trie();
     let trie_map = trie_controller.trie_map.read().unwrap();
-    let mut trie = trie_map.get(&Uuid::new_v4().to_string()).unwrap().write().unwrap();
+    match trie_map.get(&word) {
+        None => return axum::response::Json(serde_json::json!({
+            "invalid id": word
+        })),
+        Some(trie) => {
+            let mut trie = trie.write().unwrap();
+            
     println!("{:?}", params);
     match verify_word_query_param(&params, false) {
         Ok(_) => {},
@@ -251,12 +293,18 @@ async fn delete_word(Path(word): Path<String>, Query(params): Query<Params>, Sta
                 "error": e
             }))
         },
-    }
+    }}}
 }
 
 async fn delete_all(Path(word): Path<String>, State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value>{
     let trie_map = trie_controller.trie_map.read().unwrap();
-    let mut trie = trie_map.get(&Uuid::new_v4().to_string()).unwrap().write().unwrap();
+    match trie_map.get(&word) {
+        None => return axum::response::Json(serde_json::json!({
+            "invalid id": word
+        })),
+        Some(trie) => {
+            let mut trie = trie.write().unwrap();
+            
     let (num_words_before, trie_size_before) = trie.get_metadata();
     trie.delete_dictionary();
     let (num_words_after, trie_size_after) = trie.get_metadata();
@@ -264,7 +312,8 @@ async fn delete_all(Path(word): Path<String>, State(trie_controller): State<Trie
         "nodes deleted": format!("{}",  trie_size_before - trie_size_after),
         "words deleted": format!("{}",  num_words_before - num_words_after),
     }))
-}
+}}
+} 
 
 
 #[derive(Debug, Deserialize)]
@@ -275,27 +324,33 @@ struct AddWordsRequest {
 async fn add_multiple_words( Path(word): Path<String>, State(trie_controller): State<TrieController>,
     Form(sign_up): Form<AddWordsRequest>
 ) -> axum::response::Json<serde_json::Value>{
-    // println!("sign_up is {:?}", sign_up);
     let words = sign_up.words.lines().map(|s| s.to_string()).collect();
-    // println!("words are {:?}", words);
     let trie_map = trie_controller.trie_map.read().unwrap();
-    let mut trie = trie_map.get(&Uuid::new_v4().to_string()).unwrap().write().unwrap();
-    
-    let (num_words_before, trie_size_before) = trie.get_metadata();
 
-    let result = trie.add_words(words);
-    match result {
-        Ok(_) => {
-            let (num_words_after, trie_size_after) = trie.get_metadata();
-            axum::response::Json(serde_json::json!({
-                "nodes added": format!("{}", trie_size_after - trie_size_before),
-                "words added": format!("{}", num_words_after - num_words_before),
-            }))
-        },
-        Err(e) => {
-            axum::response::Json(serde_json::json!({
-                "error": e
-            }))
+    match trie_map.get(&word) {
+        None => return axum::response::Json(serde_json::json!({
+            "invalid id": word
+        })),
+        Some(trie) => {
+            let mut trie = trie.write().unwrap();
+            
+            let (num_words_before, trie_size_before) = trie.get_metadata();
+            
+            let result = trie.add_words(words);
+            match result {
+                Ok(_) => {
+                    let (num_words_after, trie_size_after) = trie.get_metadata();
+                    axum::response::Json(serde_json::json!({
+                        "nodes added": format!("{}", trie_size_after - trie_size_before),
+                        "words added": format!("{}", num_words_after - num_words_before),
+                    }))
+                },
+                Err(e) => {
+                    axum::response::Json(serde_json::json!({
+                        "error": e
+                    }))
+                }
+            }
         }
-    }
+    } 
 }

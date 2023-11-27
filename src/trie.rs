@@ -349,7 +349,7 @@ impl TrieController {
                 trie.add_words(starting_words);
                 let mut trie_map = HashMap::new();
                 trie_map.insert(Uuid::new_v4().to_string(), Arc::new(RwLock::new(trie)));
-                // println!("trie_map at initialization {:?}", trie_map);
+                println!("trie_map at initialization {:?}", trie_map);
                 Ok(TrieController {trie_map: Arc::new(RwLock::new(trie_map))})
             },
             (Err(e), _) => Err(e),
