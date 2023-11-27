@@ -338,7 +338,7 @@ pub struct TrieController{
     //I want to have a mutex on each vector
     // pub trie: Arc<RwLock<Trie>>,
     //using UUID's converted to string as keys, and Tries as the values (1 trie mapped to each uuid)
-    pub trie_map: Arc<RwLock<HashMap<Uuid, Arc<RwLock<Trie>>>>>
+    pub trie_map: Arc<RwLock<HashMap<String, Arc<RwLock<Trie>>>>>
 }
 
 //have ModelController control synchronization, start with a single trie controller by RwLock
@@ -348,26 +348,12 @@ impl TrieController {
             (Ok(mut trie), starting_words) => {
                 trie.add_words(starting_words);
                 let mut trie_map = HashMap::new();
-                trie_map.insert(Uuid::new_v4(), Arc::new(RwLock::new(trie)));
+                trie_map.insert(Uuid::new_v4().to_string(), Arc::new(RwLock::new(trie)));
                 // println!("trie_map at initialization {:?}", trie_map);
                 Ok(TrieController {trie_map: Arc::new(RwLock::new(trie_map))})
             },
             (Err(e), _) => Err(e),
         }
-    }
-
-    //
-    pub fn retrieve_trie_with_uuid_mut(&self, key: Uuid) -> Result<Trie, String> {
-        Err("TODO".to_string())
-    }
-
-    pub fn retrieve_trie_with_uuid(&self, key: Uuid) -> Result<Trie, String> {
-        Err("TODO".to_string())
-    }
-
-    //create new uuid with each post
-    pub fn create_new_trie(&mut self) -> Uuid {
-        Uuid::new_v4()
     }
 }
 
