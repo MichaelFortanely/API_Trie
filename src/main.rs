@@ -14,7 +14,6 @@ use axum::{
     Form,
     extract::{Query, Path},
 };
-//TODO JSON parsing to add multiple words, Postman API docs, user authentication
 
 
 
@@ -30,7 +29,7 @@ async fn main() {
                         .unwrap();
 
         },
-        Err(e) => {
+        Err(_) => {
             unreachable!();
         } 
     }
@@ -53,10 +52,8 @@ fn routes_crud(trie: TrieController) -> Router {
 }
 
 //
-//TODO extract trie uuid from URL
-//TODO test new multi-trie functionality
 async fn post_create_trie(State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value>{
-    println!("post add_words");
+    // println!("post add_words");
     let mut trie_map = trie_controller.trie_map.write().unwrap();
     let your_new_key = Uuid::new_v4().to_string();
     //will never fail with zero length string
@@ -70,19 +67,21 @@ async fn post_create_trie(State(trie_controller): State<TrieController>) -> axum
 }
 
 async fn delete_trie(Path(word): Path<String>, State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value>{
-    println!("post add_words");
-    println!("Item ID: {:?}\n", word);
+    // println!("post add_words");
+    // println!("Item ID: {:?}\n", word);
     let mut trie_map = trie_controller.trie_map.write().unwrap();
-    let your_new_key = Uuid::new_v4();
-    match trie_map.get(&word) {
+    match trie_map.remove(&word) {
         None => return axum::response::Json(serde_json::json!({
             "invalid id": word
         })),
         Some(trie) => {
-            trie.write().unwrap().delete_dictionary();
-            trie_map.remove(&your_new_key.to_string());
+            let mut trie = trie.write().unwrap();
+            let (num_words_before, trie_size_before) = trie.get_metadata();
+            trie.delete_dictionary();
+            let (num_words_after, trie_size_after) = trie.get_metadata();
             axum::response::Json(serde_json::json!({
-                "your-uuid": your_new_key.to_string(),
+                "nodes deleted": format!("{}",  trie_size_before - trie_size_after),
+                "words deleted": format!("{}",  num_words_before - num_words_after),
             }))
         }
     }
@@ -123,7 +122,7 @@ fn verify_word_query_param(params: &Params, is_autocomp: bool) -> Result<bool, a
 }
 
 async fn get_prefix_search(Path(word): Path<String>, Query(params): Query<Params>, State(trie_controller): State<TrieController>) -> axum::response::Json<serde_json::Value>{
-    println!("Item ID: {:?}\n", word);
+    // println!("Item ID: {:?}\n", word);
     let trie_map = trie_controller.trie_map.read().unwrap();
     match trie_map.get(&word) {
         None => return axum::response::Json(serde_json::json!({
@@ -132,14 +131,14 @@ async fn get_prefix_search(Path(word): Path<String>, Query(params): Query<Params
         Some(trie) => {
             let trie = trie.read().unwrap();
             
-    println!("{:?}", params);
+    // println!("{:?}", params);
     match verify_word_query_param(&params, false) {
         Ok(_) => {},
         Err(e) => return e,
     }
     //confirmed word exists with non zero length
     let word = params.word.unwrap();
-    println!("word in prefix search {word}");
+    // println!("word in prefix search {word}");
     let return_bool = trie.does_prefix_exist(word);
     match return_bool {
         Ok(_) => {
@@ -165,14 +164,14 @@ async fn get_word_search(Path(word): Path<String>, Query(params): Query<Params>,
         Some(trie) => {
             let trie = trie.read().unwrap();
           
-    println!("{:?}", params);
+    // println!("{:?}", params);
     match verify_word_query_param(&params, false) {
         Ok(_) => {},
         Err(e) => return e,
     }
     //confirmed word exists with non zero length
     let word = params.word.unwrap();
-    println!("word in word search is {word}");
+    // println!("word in word search is {word}");
     let return_bool = trie.does_word_exist(word);
 
     match return_bool {
@@ -198,7 +197,7 @@ async fn add_single_word(Path(word): Path<String>, Query(params): Query<Params>,
         Some(trie) => {
             let mut trie = trie.write().unwrap();
             
-    println!("{:?}", params);
+    // println!("{:?}", params);
     match verify_word_query_param(&params, false) {
         Ok(_) => {},
         Err(e) => return e,
@@ -230,14 +229,14 @@ async fn get_auto_complete(Path(word): Path<String>, Query(params): Query<Params
         Some(trie) => {
             let trie = trie.read().unwrap();
           
-    println!("{:?}", params);
+    // println!("{:?}", params);
     match verify_word_query_param(&params, true) {
         Ok(_) => {},
         Err(e) => return e,
     }
     //confirmed word exists with non zero length
     let word = params.word.unwrap();
-    println!("{word}");
+    // println!("{word}");
     if word.len() == 0{
         return axum::response::Json(serde_json::json!({"auto_complete": trie.entire_dictionary()}))
     }
@@ -277,7 +276,7 @@ async fn delete_word(Path(word): Path<String>, Query(params): Query<Params>, Sta
         Some(trie) => {
             let mut trie = trie.write().unwrap();
             
-    println!("{:?}", params);
+    // println!("{:?}", params);
     match verify_word_query_param(&params, false) {
         Ok(_) => {},
         Err(e) => return e,

@@ -70,7 +70,7 @@ impl TrieNode {
                         //exhaustively matched all chars in iterator to trie
                         if self.is_word {
                             let mut delete_child = false;
-                            println!("delete operation initiated");
+                            // println!("delete operation initiated");
                             //If I have no children then I need to bubble back up the call stack
                             //until self.is_word equals true and delete all nodes until then
                             //if I have children then just mark myself as not a word anymore
@@ -111,11 +111,11 @@ impl TrieNode {
                         //exhaustively matched all chars in iterator to trie
                         if self.is_word && must_be_complete || !must_be_complete {
                             if is_prefix_search {
-                                println!("hereee: !self.is_word: {}", !self.is_word);
+                                // println!("hereee: !self.is_word: {}", !self.is_word);
                                 return !self.is_word
                             }
                             if get_suffixes {
-                                println!("function _auto_complete initiated");
+                                // println!("function _auto_complete initiated");
                                 let mut mut_string = String::new();
                                 self._autocomplete(&mut mut_string, suffic_vec, true);
                             }
@@ -195,7 +195,7 @@ fn validate_string(contents: &mut Vec<String>) -> Result<bool, CustomError>{
         }
         for indv_char in content.clone().chars() {
             if !indv_char.is_ascii_alphabetic() {
-                println!("error with {}", indv_char);
+                // println!("error with {}", indv_char);
                 return Err(CustomError::InvalidCharacter(indv_char, content.to_string()));
             }
         }
@@ -315,7 +315,7 @@ impl Trie{
                 self.num_words -= 1;
                 self.trie_size -= return_val.1;
             } 
-            println!("Number of nodes deleted {}", return_val.1);
+            // println!("Number of nodes deleted {}", return_val.1);
             Ok(return_val.0)
         }, Err(e) => Err(e)
     }
@@ -324,12 +324,12 @@ impl Trie{
     //this function should acquire lock
     pub fn delete_dictionary(&mut self){
         for word in self.entire_dictionary() {
-            println!("next word to delete is {}", {word.clone()});
+            // println!("next word to delete is {}", {word.clone()});
             self.delete_word(word);
-            println!("Dictionary after deletion{:?}", self.entire_dictionary());
-            println!("trie size: {}; num_words: {}", self.trie_size, self.num_words);
+            // println!("Dictionary after deletion{:?}", self.entire_dictionary());
+            // println!("trie size: {}; num_words: {}", self.trie_size, self.num_words);
         }
-        println!("done!");
+        // println!("done!");
     }
     
 }
@@ -349,7 +349,7 @@ impl TrieController {
                 trie.add_words(starting_words);
                 let mut trie_map = HashMap::new();
                 trie_map.insert(Uuid::new_v4().to_string(), Arc::new(RwLock::new(trie)));
-                println!("trie_map at initialization {:?}", trie_map);
+                // println!("trie_map at initialization {:?}", trie_map);
                 Ok(TrieController {trie_map: Arc::new(RwLock::new(trie_map))})
             },
             (Err(e), _) => Err(e),
@@ -560,7 +560,6 @@ mod tests {
         }
     }
 
-    //TODO
     #[test]
     fn add_uppercase_word() {
         match Trie::new("testing_txt_files/input/test1.txt".to_string()) {
@@ -568,6 +567,9 @@ mod tests {
                 my_trie.add_words(starting_words);
                 assert_eq!(my_trie.trie_size, 29);
                 assert_eq!(my_trie.num_words, 7);
+                my_trie.add_words(vec!["BORINGS".to_string()]);
+                assert_eq!(my_trie.trie_size, 30);
+                assert_eq!(my_trie.num_words, 8);
             }, (Err(e), _) => panic!("{:?}", e),
         }
     }
@@ -682,7 +684,7 @@ mod tests {
             Ok(trie_controller) => {
                 let read_map = trie_controller.trie_map.read().unwrap();
                 let key = read_map.iter().next().unwrap().0;
-                println!("Key: {}", key);
+                // println!("Key: {}", key);
                 let ref_to_data = read_map.get(key).unwrap().read().unwrap();
                 assert_eq!(ref_to_data.trie_size, 0);
                 assert_eq!(ref_to_data.num_words, 0);
@@ -696,7 +698,7 @@ mod tests {
             Ok(trie_controller) => {
                 let read_map = trie_controller.trie_map.read().unwrap();
                 let key = read_map.iter().next().unwrap().0;
-                println!("Key: {}", key);
+                // println!("Key: {}", key);
                 let ref_to_data = read_map.get(key).unwrap().read().unwrap();
                 assert_eq!(ref_to_data.trie_size, 29);
                 assert_eq!(ref_to_data.num_words, 7);
@@ -719,7 +721,7 @@ mod tests {
                         let my_ref = my_ref.read().unwrap();
                         let actual_words: HashSet<_> = my_ref.entire_dictionary().iter().cloned().collect();
                         assert_eq!(actual_words, copy_expected_words);
-                        println!("{:?}", my_ref);
+                        // println!("{:?}", my_ref);
                     });
                     handles.push(handle);
             }
@@ -765,8 +767,5 @@ mod tests {
             }, Err(e)  => panic!("{:?}", e),
         }
     }
-
-    //create another test where I can do any other function besides 
-
     //END TEST FUNCTIONALITY OF TRIECONTROLLER
 }
