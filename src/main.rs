@@ -10,34 +10,27 @@ use std::sync::RwLock;
 
 use axum::{
     routing::{get, delete, post},
+    response::Html,
     Router,
     Form,
     extract::{Query, Path},
 };
 
 
-
-#[tokio::main]
-async fn main() {
+#[shuttle_runtime::main]
+async fn main() -> shuttle_axum::ShuttleAxum {
     //provide a file path or don't provide a file path
     let controller = TrieController::new("s.txt".to_string());
     match controller {
         Ok(controller) => {
-            axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
-                        .serve(routes_crud(controller).into_make_service())
-                        .await
-                        .unwrap();
-
-        },
-        Err(_) => {
-            unreachable!();
-        } 
-    }
-}
-
-fn routes_crud(trie: TrieController) -> Router {
-    //all routes except /create, used to create a new trie, expect a uuid
-    Router::new().route("/", get(|| async { "Hello to Michael's Trie world!"}))
+            let all_routes = Router::new().route("/", get(|| async { Html("
+            <center>
+                <h1>Welcome to Michael's Rusty API Trie Server</h1>
+                <p><a href='https://documenter.getpostman.com/view/25218989/2s9YeG6BdA'>API Documentation</a></p>
+                <p><a href='https://github.com/MichaelFortanely/API_Trie'>Github Link</a></p>
+                <p><a href='https://www.youtube.com/watch?v=dQw4w9WgXcQ'>TODO Demo video</a></p>
+            </center>
+        ".to_string())}))
     .route("/prefix/:id", get(get_prefix_search))
     .route("/wordsearch/:id", get(get_word_search))
     .route("/autocomp/:id", get(get_auto_complete))
@@ -48,7 +41,13 @@ fn routes_crud(trie: TrieController) -> Router {
     .route("/clear/:id", delete(delete_all))
     .route("/deletetrie/:id", delete(delete_trie))
     .route("/addword/:id", post(add_single_word))
-    .with_state(trie)
+    .with_state(controller);
+        Ok(all_routes.into())
+        },
+        Err(_) => {
+            unreachable!();
+        } 
+    }
 }
 
 //
@@ -353,3 +352,4 @@ async fn add_multiple_words( Path(word): Path<String>, State(trie_controller): S
         }
     } 
 }
+
