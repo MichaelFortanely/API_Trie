@@ -27,8 +27,6 @@ pub struct TrieNode {
     //to actually take care of Synchronization, will not rely on synchronization properties of RwLock at all
     children: HashMap<char, Arc<RwLock<TrieNode>>>,
 }
-//having helper functions that return refernces can get really complicated
-//try to implement this without many helper functions i.e. references that return TrieNodes bc then stuff gets really complicated
 
 
 impl TrieNode {

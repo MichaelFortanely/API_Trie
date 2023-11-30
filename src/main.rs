@@ -19,16 +19,14 @@ use axum::{
 
 #[shuttle_runtime::main]
 async fn main() -> shuttle_axum::ShuttleAxum {
-    //provide a file path or don't provide a file path
     let controller = TrieController::new("s.txt".to_string());
     match controller {
         Ok(controller) => {
             let all_routes = Router::new().route("/", get(|| async { Html("
             <center>
                 <h1>Welcome to Michael's Rusty API Trie Server</h1>
-                <p><a href='https://documenter.getpostman.com/view/25218989/2s9YeG6BdA'>API Documentation</a></p>
+                <p><a href='https://documenter.getpostman.com/view/25218989/2s9YeG6BdA'>Postman API Documentation</a></p>
                 <p><a href='https://github.com/MichaelFortanely/API_Trie'>Github Link</a></p>
-                <p><a href='https://www.youtube.com/watch?v=dQw4w9WgXcQ'>TODO Demo video</a></p>
             </center>
         ".to_string())}))
     .route("/prefix/:id", get(get_prefix_search))
@@ -96,11 +94,6 @@ struct PathParams {
     id: Option<String>,
 }
 
-//I want to have 3 different possible outocmes
-//1. expected success
-//2. error from not includding query param
-//3. error from not giving valid input (non letterinput)
-
 // http://localhost:3000/prefix?word=salty
 //add params with key-value pairs spearated by ?
 fn verify_word_query_param(params: &Params, is_autocomp: bool) -> Result<bool, axum::response::Json<serde_json::Value>>{
@@ -135,7 +128,6 @@ async fn get_prefix_search(Path(word): Path<String>, Query(params): Query<Params
         Ok(_) => {},
         Err(e) => return e,
     }
-    //confirmed word exists with non zero length
     let word = params.word.unwrap();
     // println!("word in prefix search {word}");
     let return_bool = trie.does_prefix_exist(word);
